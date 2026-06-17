@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
+<meta name="theme-color" content="#0f1117"/>
+<title>AttendX - Bluetooth Attendance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"/>
+<style>
+:root{
+  --bg:#0f1117;--surface:#161b27;--surface2:#1e2535;--surface3:#263045;
+  --border:#1e2d45;--border2:#2a3f5f;
+  --text:#eef2ff;--text2:#8fa3c0;--text3:#4d6280;
+  --indigo:#6366f1;--indigo-light:#818cf8;--indigo-dark:#4338ca;
+  --cyan:#06b6d4;--cyan-bg:rgba(6,182,212,0.12);
+  --green:#10b981;--green-bg:rgba(16,185,129,0.12);
+  --red:#f43f5e;--red-bg:rgba(244,63,94,0.12);
+  --amber:#f59e0b;--amber-bg:rgba(245,158,11,0.12);
+  --r8:8px;--r10:10px;--r12:12px;--r16:16px;
+  --mono:'JetBrains Mono',monospace;--sans:'Inter',system-ui,sans-serif;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);line-height:1.5;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+
+.topbar{height:56px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:10px;flex-shrink:0}
+.back-btn{background:transparent;border:1px solid var(--border2);border-radius:var(--r8);color:var(--text2);cursor:pointer;height:34px;padding:0 11px;display:flex;align-items:center;gap:5px;font-family:var(--sans);font-size:.8rem;font-weight:600;transition:all .15s;text-decoration:none}
+.back-btn:hover{background:var(--surface2);color:var(--text);border-color:var(--border2)}
+.topbar-title{font-size:.95rem;font-weight:700;flex:1;display:flex;align-items:center;gap:6px}
+.topbar-title i{color:var(--cyan)}
+
+.container{flex:1;overflow-y:auto;padding:20px;max-width:600px;margin:0 auto;width:100%}
+.page-header{margin-bottom:20px;text-align:center}
+.page-title{font-size:1.4rem;font-weight:800;letter-spacing:-.02em;margin-bottom:4px}
+.page-sub{font-size:.85rem;color:var(--text2)}
+
+.bt-radar{width:120px;height:120px;border-radius:50%;background:var(--surface2);border:2px solid var(--border2);margin:0 auto 24px;display:grid;place-items:center;position:relative}
+.bt-icon{font-size:3rem;color:var(--text3);transition:all .3s}
+.bt-radar.scanning .bt-icon{color:var(--cyan);animation:pulse-icon 1.5s infinite}
+.bt-radar.scanning::before,.bt-radar.scanning::after{content:'';position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--cyan);opacity:0;animation:radar-wave 2s cubic-bezier(0,0,.2,1) infinite}
+.bt-radar.scanning::after{animation-delay:1s}
+
+@keyframes pulse-icon{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+@keyframes radar-wave{0%{transform:scale(1);opacity:.6}100%{transform:scale(2);opacity:0}}
+
+.status-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:.75rem;font-weight:700;letter-spacing:.04em;background:var(--surface2);color:var(--text2);margin-bottom:20px}
+.status-badge.scanning{background:var(--cyan-bg);color:var(--cyan)}
+.status-dot{width:8px;height:8px;border-radius:50%;background:currentColor}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 20px;border-radius:var(--r10);font-family:var(--sans);font-size:.95rem;font-weight:700;cursor:pointer;border:none;transition:all .15s;width:100%}
+.btn:active{transform:scale(.98)}
+.btn-cyan{background:var(--cyan);color:#fff;box-shadow:0 4px 15px rgba(6,182,212,.3)}
+.btn-cyan:hover{background:#0891b2}
+.btn-danger{background:transparent;border:1px solid rgba(244,63,94,.4);color:var(--red)}
+.btn-danger:hover{background:var(--red-bg)}
+
+.stats-bar{display:flex;gap:10px;margin-bottom:20px}
+.stat-box{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--r10);padding:12px;text-align:center}
+.stat-label{font-size:.7rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.stat-val{font-family:var(--mono);font-size:1.4rem;font-weight:700}
+.stat-val.c-cyan{color:var(--cyan)}
+
+.list-header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.list-title{font-size:.9rem;font-weight:700;color:var(--text)}
+.list-actions button{background:none;border:none;color:var(--text3);cursor:pointer;font-size:.8rem;font-weight:600;transition:color .15s}
+.list-actions button:hover{color:var(--red)}
+
+.student-list{display:flex;flex-direction:column;gap:8px;margin-bottom:24px}
+.student-row{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--cyan);border-radius:var(--r10);padding:12px 14px;display:flex;align-items:center;gap:12px;animation:slideIn .3s ease}
+@keyframes slideIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.student-avatar{width:38px;height:38px;border-radius:50%;background:var(--surface2);display:grid;place-items:center;font-size:.8rem;font-weight:700;color:var(--text2);flex-shrink:0}
+.student-info{flex:1;min-width:0}
+.student-name{font-size:.9rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.student-meta{font-size:.7rem;color:var(--text3);font-family:var(--mono);margin-top:2px}
+.att-badge{font-size:.7rem;font-weight:700;background:var(--cyan-bg);color:var(--cyan);padding:4px 8px;border-radius:6px}
+
+.empty-state{text-align:center;padding:30px 20px;color:var(--text3);background:var(--surface);border:1px dashed var(--border2);border-radius:var(--r10)}
+.empty-state i{font-size:2rem;margin-bottom:10px;opacity:.5}
+.empty-state p{font-size:.85rem}
+
+.https-warning{background:var(--amber-bg);border:1px solid rgba(245,158,11,.3);color:var(--amber);padding:12px;border-radius:var(--r8);font-size:.8rem;margin-bottom:20px;display:none;align-items:flex-start;gap:8px}
+.https-warning i{font-size:1.1rem;flex-shrink:0}
+
+@media(max-width:480px){
+  .container{padding:16px}
+  .bt-radar{width:100px;height:100px}
+  .bt-icon{font-size:2.5rem}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="index.html" class="back-btn"><i class="ti ti-arrow-left"></i> Back</a>
+  <span class="topbar-title"><i class="ti ti-bluetooth"></i> BT Scanner</span>
+</div>
+
+<div class="container">
+  <div class="https-warning" id="https-warning">
+    <i class="ti ti-alert-triangle"></i>
+    <div>Web Bluetooth API requires a secure context. Please serve this page over <strong>HTTPS</strong> or <strong>localhost</strong>.</div>
+  </div>
+
+  <div class="page-header">
+    <h1 class="page-title">Bluetooth Roll Call</h1>
+    <p class="page-sub">Scan student devices (phones, BLE badges) to mark attendance</p>
+  </div>
+
+  <div class="bt-radar" id="radar">
+    <i class="ti ti-bluetooth bt-icon"></i>
+  </div>
+
+  <div style="text-align:center">
+    <div class="status-badge" id="status-badge">
+      <div class="status-dot"></div>
+      <span id="status-text">Standby</span>
+    </div>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat-box">
+      <div class="stat-label">Scanned</div>
+      <div class="stat-val c-cyan" id="stat-count">0</div>
+    </div>
+  </div>
+
+  <button class="btn btn-cyan" id="btn-scan" onclick="BluetoothScanner.requestDevice()"><i class="ti ti-scan"></i> Scan Next Device</button>
+  
+  <div style="margin-top:30px">
+    <div class="list-header">
+      <div class="list-title">Detected Devices</div>
+      <div class="list-actions">
+        <button onclick="BluetoothScanner.clearList()">Clear All</button>
+      </div>
+    </div>
+    
+    <div class="student-list" id="device-list">
+      <div class="empty-state" id="empty-state">
+        <i class="ti ti-devices"></i>
+        <p>No devices scanned yet.<br>Click "Scan Next Device" to begin.</p>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn btn-danger" style="margin-top:10px" onclick="BluetoothScanner.saveAndReturn()">
+    <i class="ti ti-device-floppy"></i> Save to Main App & Return
+  </button>
+</div>
+
+<script>
+const DB_KEY = 'ax2_bt_temp_attendance';
+
+const BluetoothScanner = {
+  devices: [],
+  
+  init() {
+    // Check HTTPS/localhost requirement for Web Bluetooth
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      document.getElementById('https-warning').style.display = 'flex';
+      document.getElementById('btn-scan').disabled = true;
+      document.getElementById('btn-scan').style.opacity = '0.5';
+      document.getElementById('btn-scan').style.cursor = 'not-allowed';
+    }
+
+    // Load temp session if exists
+    try {
+      const saved = localStorage.getItem(DB_KEY);
+      if(saved) {
+        this.devices = JSON.parse(saved);
+        this.renderList();
+      }
+    } catch(e) {}
+  },
+
+  setStatus(mode) {
+    const radar = document.getElementById('radar');
+    const badge = document.getElementById('status-badge');
+    const text = document.getElementById('status-text');
+
+    if (mode === 'scanning') {
+      radar.classList.add('scanning');
+      badge.classList.add('scanning');
+      text.textContent = 'Scanning...';
+    } else {
+      radar.classList.remove('scanning');
+      badge.classList.remove('scanning');
+      text.textContent = 'Standby';
+    }
+  },
+
+  async requestDevice() {
+    if (!navigator.bluetooth) {
+      alert("Web Bluetooth API is not supported in this browser. Please use Chrome/Edge on Desktop or Chrome on Android.");
+      return;
+    }
+
+    this.setStatus('scanning');
+
+    try {
+      /* Note: Web Bluetooth's requestDevice requires user interaction and shows a browser picker. 
+        It allows selecting ONE device at a time.
+        For passive background scanning of multiple beacons, `navigator.bluetooth.requestLEScan` 
+        is required but it is currently behind experimental flags in Chrome.
+      */
+      const device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        // Optional: filter by specific GATT services if students are broadcasting a specific AttendX service UUID
+        // filters: [{ services: ['0000180f-0000-1000-8000-00805f9b34fb'] }] 
+      });
+
+      this.addDevice(device);
+      this.setStatus('standby');
+
+    } catch (error) {
+      this.setStatus('standby');
+      // If user cancelled the picker, don't show an ugly alert
+      if(error.name !== 'NotFoundError' && error.name !== 'SecurityError') {
+         console.log('Bluetooth operation cancelled or failed:', error);
+      }
+    }
+  },
+
+  addDevice(device) {
+    // Prevent duplicates by checking device ID (if available) or Name
+    const exists = this.devices.find(d => d.id === device.id || (d.name === device.name && d.name !== 'Unknown Device'));
+    
+    if (exists) {
+      alert(`Device ${device.name || 'Unknown'} has already been marked present!`);
+      return;
+    }
+
+    const newDevice = {
+      id: device.id || '_' + Math.random().toString(36).substr(2, 9),
+      name: device.name || 'Unknown Bluetooth Device',
+      timestamp: new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit', second:'2-digit'})
+    };
+
+    this.devices.push(newDevice);
+    this.save();
+    this.renderList();
+  },
+
+  clearList() {
+    if(this.devices.length === 0) return;
+    if(confirm('Clear all scanned devices?')) {
+      this.devices = [];
+      this.save();
+      this.renderList();
+    }
+  },
+
+  save() {
+    localStorage.setItem(DB_KEY, JSON.stringify(this.devices));
+  },
+
+  saveAndReturn() {
+    // In a real application, you would map these Bluetooth MACs/IDs to actual Student IDs.
+    // For now, we save it in localStorage so the main app can read it.
+    if(this.devices.length > 0) {
+      alert(`Saved ${this.devices.length} devices to temporary storage. Return to main app to map them to students.`);
+    }
+    window.location.href = 'index.html';
+  },
+
+  getAvatarColor(name) {
+    const C=['#6366f1','#10b981','#f43f5e','#f59e0b','#06b6d4','#8b5cf6','#ec4899'];
+    let h=0; for(const c of name) h=(h*31+c.charCodeAt(0))%C.length; return C[h];
+  },
+
+  getInitials(name) {
+    if(name === 'Unknown Bluetooth Device') return 'BT';
+    return name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase() || '?';
+  },
+
+  renderList() {
+    const listEl = document.getElementById('device-list');
+    document.getElementById('stat-count').textContent = this.devices.length;
+
+    if (this.devices.length === 0) {
+      listEl.innerHTML = `
+        <div class="empty-state" id="empty-state">
+          <i class="ti ti-devices"></i>
+          <p>No devices scanned yet.<br>Click "Scan Next Device" to begin.</p>
+        </div>`;
+      return;
+    }
+
+    listEl.innerHTML = this.devices.slice().reverse().map(d => {
+      const color = this.getAvatarColor(d.name);
+      return `
+      <div class="student-row">
+        <div class="student-avatar" style="background:${color}22; color:${color}; border: 1px solid ${color}44">
+          ${this.getInitials(d.name)}
+        </div>
+        <div class="student-info">
+          <div class="student-name">${d.name}</div>
+          <div class="student-meta">ID: ${d.id.substring(0,8)}... · Scanned at ${d.timestamp}</div>
+        </div>
+        <div class="att-badge">PRESENT</div>
+      </div>
+      `;
+    }).join('');
+  }
+};
+
+window.addEventListener('DOMContentLoaded', () => {
+  BluetoothScanner.init();
+});
+</script>
+</body>
+</html>
