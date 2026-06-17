@@ -949,6 +949,36 @@ const State={
   studentsGrouped:false, _exportContext:'records'
 };
 
+/* ── API Integration ── */
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwKFkDnN1sbUZHRarEht7MVj51QkcCnt9U_Uen_icu5/dev';
+
+const API = {
+  async get(action) {
+    if (!navigator.onLine) return null;
+    try {
+      const response = await fetch(`${GAS_URL}?action=${action}`);
+      return await response.json();
+    } catch (error) {
+      console.error(`Error fetching ${action}:`, error);
+      return { success: false, error };
+    }
+  },
+  async post(action, data) {
+    if (!navigator.onLine) return null;
+    try {
+      const response = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: action, data: data })
+      });
+      return await response.json();
+    } catch (error) {
+      console.error(`Error posting ${action}:`, error);
+      return { success: false, error };
+    }
+  }
+};
+
 function saveAll(){
   DB.set('users',State.users);
   DB.set('institutions',State.institutions);
@@ -988,10 +1018,6 @@ const Confirm={
 function applyRolePermissions() {
   const isAdmin = State.currentUser?.role === 'admin';
   
-  // TEACHERS CAN NOW MANAGE STUDENTS: 
-  // We no longer hide the Add/Import buttons in the Register/Students views, 
-  // nor do we hide the Edit/Delete student buttons.
-  
   // Make sure Student topbar actions are visible for everyone
   const regActions = document.querySelector('#view-register .page-actions');
   if(regActions) regActions.style.display = 'flex';
@@ -1001,10 +1027,6 @@ function applyRolePermissions() {
   
   // Make sure Student Delete buttons are visible for everyone
   document.querySelectorAll('.sc-btn.del-btn').forEach(btn => btn.style.display = 'flex');
-
-  // ---------------------------------------------------------
-  // ADMIN ONLY ACTIONS (Keep restricted for Teachers)
-  // ---------------------------------------------------------
 
   // Show/Hide 'Clear All' Button in Records
   const clearAllBtn = document.querySelector('#view-records .page-actions .btn-danger');
@@ -1116,8 +1138,6 @@ const Auth={
     }
   },
 
-  // --- ADDED BIOMETRIC AND PASSWORD TOGGLE FUNCTIONS ---
-
   togglePw(){
     const inp=document.getElementById('login-pass');
     const eye=document.getElementById('pw-eye');
@@ -1143,7 +1163,6 @@ const Auth={
             rp: { name: 'AttendX', id: rpId },
             user: { id: userId, name: user.username, displayName: user.username },
             pubKeyCredParams: [{alg: -7, type: 'public-key'}, {alg: -257, type: 'public-key'}],
-            // 'platform' forces it to look for Fingerprint/FaceID/Windows Hello instead of a USB key
             authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
             timeout: 60000
           }
@@ -1166,8 +1185,6 @@ const Auth={
     } else {
         toast('HTTPS or localhost required for Passkeys. Using PIN fallback.', 'err');
     }
-    
-    // Fallback if WebAuthn throws an error or isn't on localhost/HTTPS
     this._setupPinBiometric(user);
   },
 
@@ -1202,7 +1219,6 @@ const Auth={
        window.location.hostname === 'localhost' ||
        window.location.hostname === '127.0.0.1');
 
-    // Attempt WebAuthn first if available
     if(webAuthnUsers.length && canUseWebAuthn) {
       try {
         const rpId = window.location.hostname || 'localhost';
@@ -1219,11 +1235,10 @@ const Auth={
       } catch(e) { 
         console.warn('WebAuthn login failed:', e); 
         toast('Biometric prompt cancelled or failed.', 'err');
-        return; // Don't fall through to PIN if they explicitly cancelled WebAuthn
+        return; 
       }
     }
 
-    // Attempt PIN fallback
     if(pinUsers.length) {
       const pin = prompt('Enter your Biometric PIN:');
       if(!pin) return toast('PIN cancelled.', 'err');
@@ -1238,15 +1253,12 @@ const Auth={
       return;
     }
     
-    // Warning if they registered on HTTPS but are now opening it as a local file
     if(webAuthnUsers.length && !canUseWebAuthn) {
         toast('Please run via localhost/HTTPS to use your Passkey.', 'err');
     }
   },
 
-  // ----------------------------------------------------
-  
-  _enterApp(user){
+  async _enterApp(user){
     if (!user.role) user.role = 'teacher'; 
     if (!user.theme) user.theme = 'light';
     
@@ -1255,11 +1267,29 @@ const Auth={
     document.body.setAttribute('data-theme', user.theme); 
     
     document.getElementById('screen-login').classList.remove('active');
+    
     this._loadData();
+    this._syncWithBackend(); 
+    
     if(!State.institutions.length && user.role === 'admin'){
       SetupWizard.start();
     } else {
       this._bootApp();
+    }
+  },
+
+  async _syncWithBackend() {
+    if (!navigator.onLine) return;
+    try {
+      const stuRes = await API.get('students');
+      if (stuRes && stuRes.success && stuRes.data) {
+          State.students = stuRes.data;
+          DB.set('students', State.students);
+          if (App._current === 'students') Students.render();
+          if (App._current === 'register') Register.render();
+      }
+    } catch(e) {
+      console.error("Sync failed", e);
     }
   },
   
@@ -1308,21 +1338,15 @@ const Auth={
     }
     updateHomeContext();
     
-    // --- DASHBOARD GRID ARRANGEMENT ---
     const manageTile = document.querySelector('.t-manage');
     const studentsTile = document.querySelector('.t-students');
     
     if (State.currentUser?.role === 'admin') {
-      // Admin: 6 cards total (Even grid)
       if (manageTile) manageTile.style.display = 'flex';
       if (studentsTile) studentsTile.style.gridColumn = 'span 1'; 
     } else {
-      // Teacher: 5 cards total (Manage is hidden)
-      // We make the 'Students' card stretch across both columns to fill the gap
       if (manageTile) manageTile.style.display = 'none';
       if (studentsTile) studentsTile.style.gridColumn = 'span 2'; 
-      
-      // Render Teacher Analytics above the grid
       TeacherAnalytics.renderDashboard();
     }
     
@@ -1489,7 +1513,6 @@ const App={
 /* ── Teacher Analytics Widget ── */
 const TeacherAnalytics = {
   renderDashboard() {
-    // Inject this right above the home-grid in the dashboard
     const homeWrap = document.querySelector('.home-wrap');
     let statsContainer = document.getElementById('teacher-stats-container');
     
@@ -1500,10 +1523,9 @@ const TeacherAnalytics = {
       homeWrap.insertBefore(statsContainer, document.querySelector('.home-grid'));
     }
 
-    const records = State.records; // In a larger system, filter by teacher's classes
+    const records = State.records; 
     const totalSessions = records.length;
     
-    // Calculate global average attendance
     let totalPresent = 0, totalMarked = 0;
     records.forEach(r => {
       Object.values(r.attendance).forEach(v => {
@@ -1561,7 +1583,6 @@ const BackupEngine = {
           const data = JSON.parse(e.target.result);
           if (!data.users || !data.records) throw new Error("Invalid backup format");
           
-          // Apply data safely
           DB.set('users', data.users);
           DB.set('institutions', data.institutions);
           DB.set('branches', data.branches);
@@ -1579,7 +1600,7 @@ const BackupEngine = {
       reader.readAsText(file);
     }, 'Overwrite Data');
     
-    input.value = ''; // Reset input
+    input.value = ''; 
   }
 };
 
@@ -1715,8 +1736,8 @@ const ManageView={
   },
 
   importForClass(id) {
-    App._selectClass(id); // Set class as active
-    Students.openImport(); // Trigger existing CSV modal
+    App._selectClass(id); 
+    Students.openImport(); 
   },
 
   _renderClasses(el){
@@ -2023,6 +2044,7 @@ const Register={
     const total=State.students.filter(s=>s.classId===State.currentClassId).length;
     if(!total)return toast('No students in this class','err');
     const marked=Object.keys(State.attendance).length;
+    
     const proceed=()=>{
       const en=document.getElementById('edit-notice');const editId=en.dataset.id;
       const recId=editId||uid();
@@ -2034,10 +2056,18 @@ const Register={
         savedAt:new Date().toISOString(),
         batch:cls?.subject||'',
         institutionName:State.institutions.find(i=>i.id===State.activeInstitutionId)?.name||''};
-      State.records=State.records.filter(r=>r.id!==recId);State.records.push(rec);saveAll();
+      State.records=State.records.filter(r=>r.id!==recId);
+      State.records.push(rec);
+      saveAll();
+      
       const absentCount=Object.values(State.attendance).filter(v=>v.status==='absent').length;
       toast(absentCount?`Saved — ${absentCount} absence(s) logged`:'Record saved!');
       this.clearSession();
+
+      // NEW: Sync to Google Apps Script
+      API.post('markAttendance', rec).then(res => {
+        if(res && !res.success) console.error("Cloud sync failed for attendance");
+      });
     };
     if(marked<total){Confirm.show(`${total-marked} student(s) not marked. Save anyway?`,proceed,'Save Anyway');}
     else proceed();
@@ -2167,11 +2197,27 @@ const Students={
       mobile:document.getElementById('st-mobile').value.trim(),email:document.getElementById('st-email').value.trim(),
       pmobile:document.getElementById('st-pmobile').value.trim(),ptelegram:document.getElementById('st-telegram').value.trim(),
       pemail:document.getElementById('st-pemail').value.trim()};
-    if(id){const i=State.students.findIndex(x=>x.id===id);State.students[i]={...State.students[i],...data};}
-    else State.students.push({id:uid(),...data});
-    saveAll();Modals.close('student');this.render();
+      
+    let newStudentData;
+    if(id){
+      const i=State.students.findIndex(x=>x.id===id);
+      State.students[i]={...State.students[i],...data};
+      newStudentData = State.students[i];
+    } else {
+      newStudentData = {id:uid(),...data};
+      State.students.push(newStudentData);
+    }
+    
+    saveAll();
+    Modals.close('student');
+    this.render();
     if(document.getElementById('view-register').classList.contains('active'))Register.render();
     toast('Student saved');
+
+    // NEW: Sync to Google Apps Script
+    API.post('addStudent', newStudentData).then(res => {
+      if(res && !res.success) toast('Cloud sync failed for student', 'err');
+    });
   },
   delete(id){
     const s=State.students.find(x=>x.id===id);
@@ -2598,14 +2644,7 @@ const ProfileModal={
   }
 };
 
-/* ══ INSTALL PROMPT ══
-   Strategy:
-   1. Always listen for beforeinstallprompt (Chrome/Edge/Android).
-   2. Detect iOS Safari separately — show manual instructions.
-   3. Never show if already running in standalone mode.
-   4. Show the modal on first login; also keep the inline button working.
-   5. Guard with a session flag so modal only fires once per session.
-*/
+/* ══ INSTALL PROMPT ══ */
 const InstallPrompt={
   _deferred:null,
   _shownModal:false,
@@ -2617,35 +2656,28 @@ const InstallPrompt={
       navigator.standalone===true;
   },
   init(){
-    // Chrome / Edge / Android WebAPK path
     window.addEventListener('beforeinstallprompt',(e)=>{
       e.preventDefault();
       this._deferred=e;
-      // Reveal the inline button too
       const btn=document.getElementById('pwa-install-btn');
       if(btn)btn.style.display='flex';
-      // If user already logged in and modal not yet shown, fire now
       if(State.loggedIn&&!this._shownModal)this._tryShowModal();
     });
-    // Fired when user installs from browser UI (hides inline button)
     window.addEventListener('appinstalled',()=>{
       document.getElementById('pwa-install-btn').style.display='none';
       this._deferred=null;
     });
   },
   onLogin(){
-    // Called right after _bootApp(). Race: deferred may arrive later.
-    if(this._isStandalone())return;   // already installed — nothing to do
+    if(this._isStandalone())return;   
     if(this._deferred)this._tryShowModal();
-    else if(this._isIOS())this._tryShowModal(); // iOS: show manual hint immediately
-    // else: beforeinstallprompt will call _tryShowModal when it arrives
+    else if(this._isIOS())this._tryShowModal(); 
   },
   _tryShowModal(){
     if(this._shownModal)return;
     if(this._isStandalone())return;
     this._shownModal=true;
     const modal=document.getElementById('install-modal-overlay');
-    // Show/hide the correct CTA vs iOS hint
     document.getElementById('install-cta-btn').style.display=this._deferred?'flex':'none';
     document.getElementById('install-ios-hint').style.display=this._isIOS()&&!this._deferred?'block':'none';
     modal.classList.add('open');
@@ -2665,7 +2697,6 @@ const InstallPrompt={
   dismiss(){document.getElementById('install-modal-overlay').classList.remove('open');}
 };
 
-// Legacy inline button wires to InstallPrompt
 function installPWA(){InstallPrompt.install();}
 
 /* ══ SERVICE WORKER ══ */
