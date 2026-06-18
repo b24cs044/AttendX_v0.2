@@ -2221,7 +2221,18 @@ const Students={
   },
   delete(id){
     const s=State.students.find(x=>x.id===id);
-    Confirm.show(`Delete "${s?.name}"? Historical records preserved.`,()=>{State.students=State.students.filter(x=>x.id!==id);saveAll();this.render();toast('Student deleted');},'Delete');
+    Confirm.show(`Delete "${s?.name}"? Historical records preserved.`,()=>{
+      // 1. Delete locally for instant UI update
+      State.students=State.students.filter(x=>x.id!==id);
+      saveAll();
+      this.render();
+      toast('Student deleted locally, syncing...');
+
+      // 2. Tell the Google Apps Script backend to delete it
+      API.post('deleteStudent', {id: id}).then(res => {
+         if(res && !res.success) toast("Cloud delete failed", "err");
+      });
+    },'Delete');
   },
   openImport(){document.getElementById('import-preview').innerHTML='';document.getElementById('btn-import-confirm').style.display='none';document.getElementById('csv-file-input').value='';State.csvPreviewData=[];Modals.open('import');},
   dragOver(e){e.preventDefault();document.getElementById('import-drop-zone').classList.add('drag-over');},
@@ -2254,14 +2265,31 @@ const Students={
     reader.readAsText(file);
   },
   confirmImport(){
-    let count=0;
+    let newStudents = []; // Array to hold the bulk data for the backend
+    
     State.csvPreviewData.forEach(row=>{
-      State.students.push({id:uid(),classId:State.currentClassId,institutionId:State.activeInstitutionId,
-        name:row.name||'',roll:row.roll_number||'',sid:row.student_id||'',
-        mobile:row.mobile||'',email:row.email||'',pmobile:row.parent_mobile||'',
-        ptelegram:row.parent_telegram||'',pemail:row.parent_email||''});count++;
+      const newStudent = {
+        id:uid(), classId:State.currentClassId, institutionId:State.activeInstitutionId,
+        name:row.name||'', roll:row.roll_number||'', sid:row.student_id||'',
+        mobile:row.mobile||'', email:row.email||'', pmobile:row.parent_mobile||'',
+        ptelegram:row.parent_telegram||'', pemail:row.parent_email||''
+      };
+      newStudents.push(newStudent);
+      State.students.push(newStudent);
     });
-    saveAll();Modals.close('import');this.render();Register.render();toast(`Imported ${count} students`);
+    
+    // 1. Save locally and update UI instantly
+    saveAll();
+    Modals.close('import');
+    this.render();
+    Register.render();
+    toast(`Importing ${newStudents.length} students to cloud...`);
+
+    // 2. Send the bulk data to the Google Apps Script backend
+    API.post('importStudents', newStudents).then(res => {
+       if(res && res.success) toast('Cloud import complete!');
+       else toast('Cloud sync failed for import', 'err');
+    });
   }
 };
 
