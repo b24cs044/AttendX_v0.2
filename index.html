@@ -724,6 +724,21 @@ tbody tr:hover td{background:rgba(255,255,255,.015)}
           <input type="email" id="st-email" class="form-input" placeholder="student@school.edu"/>
         </div>
       </div>
+      <div class="section-divider">Academic Info</div>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">Class / Semester</label>
+          <input type="text" id="st-class" class="form-input" placeholder="e.g. 3rd Year / Sem-5"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Section</label>
+          <input type="text" id="st-section" class="form-input" placeholder="e.g. A, B, C"/>
+        </div>
+        <div class="form-group col-span-2">
+          <label class="form-label">Department</label>
+          <input type="text" id="st-dept" class="form-input" placeholder="e.g. Computer Science & Engineering"/>
+        </div>
+      </div>
       <div class="section-divider">Parent / Guardian</div>
       <div class="form-grid-2">
         <div class="form-group">
@@ -808,7 +823,7 @@ tbody tr:hover td{background:rgba(255,255,255,.015)}
       <p style="font-size:.8rem;color:var(--text2);margin-bottom:13px">
         Upload a <code style="background:var(--surface2);padding:2px 5px;border-radius:4px">.csv</code> file.
         Required: <code style="background:var(--surface2);padding:2px 5px;border-radius:4px">name</code>.
-        Optional: <code style="background:var(--surface2);padding:2px 5px;border-radius:4px">roll_number, student_id, mobile, email, parent_mobile, parent_telegram, parent_email</code>
+        Optional: <code style="background:var(--surface2);padding:2px 5px;border-radius:4px">roll_number, student_id, mobile, email, parent_mobile, parent_telegram, parent_email, class_sem, section, department</code>
       </p>
       <div class="upload-zone" id="import-drop-zone"
         onclick="document.getElementById('csv-file-input').click()"
@@ -2173,7 +2188,7 @@ const Students={
   openAddModal(){
     if(!State.currentClassId)return toast('Select a class first','err');
     document.getElementById('edit-student-id').value='';
-    ['st-name','st-sid','st-roll','st-mobile','st-email','st-pmobile','st-telegram','st-pemail'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    ['st-name','st-sid','st-roll','st-mobile','st-email','st-pmobile','st-telegram','st-pemail','st-class','st-section','st-dept'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     document.getElementById('modal-student-title').textContent='Add Student';Modals.open('student');
   },
   edit(id){
@@ -2187,16 +2202,28 @@ const Students={
     document.getElementById('st-pmobile').value=s.pmobile||'';
     document.getElementById('st-telegram').value=s.ptelegram||'';
     document.getElementById('st-pemail').value=s.pemail||'';
+    document.getElementById('st-class').value=s.classSem||'';
+    document.getElementById('st-section').value=s.section||'';
+    document.getElementById('st-dept').value=s.department||'';
     document.getElementById('modal-student-title').textContent='Edit Student';Modals.open('student');
   },
   save(){
     const name=document.getElementById('st-name').value.trim();if(!name)return toast('Name is required','err');
     const id=document.getElementById('edit-student-id').value;
+    const newSid=document.getElementById('st-sid').value.trim();
+    // Duplicate student_id check (skip if editing same student)
+    if(newSid){
+      const dup=State.students.find(x=>x.sid===newSid&&x.id!==id);
+      if(dup)return toast(`Student ID "${newSid}" already exists (${dup.name}). Use a unique ID.`,'err');
+    }
     const data={name,classId:State.currentClassId,institutionId:State.activeInstitutionId,
-      sid:document.getElementById('st-sid').value.trim(),roll:document.getElementById('st-roll').value.trim(),
+      sid:newSid,roll:document.getElementById('st-roll').value.trim(),
       mobile:document.getElementById('st-mobile').value.trim(),email:document.getElementById('st-email').value.trim(),
       pmobile:document.getElementById('st-pmobile').value.trim(),ptelegram:document.getElementById('st-telegram').value.trim(),
-      pemail:document.getElementById('st-pemail').value.trim()};
+      pemail:document.getElementById('st-pemail').value.trim(),
+      classSem:document.getElementById('st-class').value.trim(),
+      section:document.getElementById('st-section').value.trim(),
+      department:document.getElementById('st-dept').value.trim()};
       
     let newStudentData;
     if(id){
@@ -2256,34 +2283,46 @@ const Students={
       document.getElementById('import-preview').innerHTML=`
         <div style="margin-top:13px;font-size:.8rem;color:var(--text2);margin-bottom:7px">Found <strong style="color:var(--text)">${rows.length}</strong> student(s):</div>
         <div class="import-preview-table"><div class="table-card"><table>
-          <thead><tr><th>Name</th><th>Roll</th><th>ID</th><th>Mobile</th></tr></thead>
-          <tbody>${rows.slice(0,8).map(r=>`<tr><td>${r.name||'—'}</td><td class="td-mono">${r.roll_number||'—'}</td><td class="td-mono">${r.student_id||'—'}</td><td>${r.mobile||'—'}</td></tr>`).join('')}
-          ${rows.length>8?`<tr><td colspan="4" style="text-align:center;color:var(--text3);font-size:.76rem">…and ${rows.length-8} more</td></tr>`:''}
+          <thead><tr><th>Name</th><th>Roll</th><th>ID</th><th>Mobile</th><th>Sem/Class</th><th>Section</th><th>Dept</th></tr></thead>
+          <tbody>${rows.slice(0,8).map(r=>`<tr><td>${r.name||'—'}</td><td class="td-mono">${r.roll_number||'—'}</td><td class="td-mono">${r.student_id||'—'}</td><td>${r.mobile||'—'}</td><td>${r.class_sem||'—'}</td><td>${r.section||'—'}</td><td>${r.department||'—'}</td></tr>`).join('')}
+          ${rows.length>8?`<tr><td colspan="7" style="text-align:center;color:var(--text3);font-size:.76rem">…and ${rows.length-8} more</td></tr>`:''}
           </tbody></table></div></div>`;
       document.getElementById('btn-import-confirm').style.display='inline-flex';
     };
     reader.readAsText(file);
   },
   confirmImport(){
-    let newStudents = []; // Array to hold the bulk data for the backend
+    let newStudents = [];
+    let skipped = [];
     
     State.csvPreviewData.forEach(row=>{
+      const sid = row.student_id||'';
+      // Skip if a student with the same non-empty ID already exists
+      if(sid && State.students.some(x=>x.sid===sid)){
+        skipped.push(row.name||sid);
+        return;
+      }
       const newStudent = {
         id:uid(), classId:State.currentClassId, institutionId:State.activeInstitutionId,
-        name:row.name||'', roll:row.roll_number||'', sid:row.student_id||'',
+        name:row.name||'', roll:row.roll_number||'', sid:sid,
         mobile:row.mobile||'', email:row.email||'', pmobile:row.parent_mobile||'',
-        ptelegram:row.parent_telegram||'', pemail:row.parent_email||''
+        ptelegram:row.parent_telegram||'', pemail:row.parent_email||'',
+        classSem:row.class_sem||'', section:row.section||'', department:row.department||''
       };
       newStudents.push(newStudent);
       State.students.push(newStudent);
     });
     
-    // 1. Save locally and update UI instantly
     saveAll();
     Modals.close('import');
     this.render();
     Register.render();
-    toast(`Importing ${newStudents.length} students to cloud...`);
+    
+    if(skipped.length){
+      toast(`Imported ${newStudents.length} student(s). Skipped ${skipped.length} duplicate ID(s): ${skipped.slice(0,3).join(', ')}${skipped.length>3?' …':''}`, 'err', 6000);
+    } else {
+      toast(`Importing ${newStudents.length} students to cloud...`);
+    }
 
     // 2. Send the bulk data to the Google Apps Script backend
     API.post('importStudents', newStudents).then(res => {
