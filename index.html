@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
-<meta name="theme-color" content="#0f1117"/>
+<meta name="theme-color" content="#f8fafc"/>
 <link rel="manifest" href="manifest.json"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -438,7 +438,7 @@ tbody tr:hover td{background:rgba(255,255,255,.015)}
 }
 </style>
 </head>
-<body>
+<body data-theme="light">
 
 <div class="screen active" id="screen-login">
   <div class="login-card">
@@ -2091,7 +2091,6 @@ const Register={
 
 /* ── Students ── */
 const Students={
-  _dragSrc:null,
   toggleGrouping(){
     State.studentsGrouped=!State.studentsGrouped;
     const btn=document.getElementById('btn-group-toggle');
@@ -2124,13 +2123,14 @@ const Students={
     } else {
       el.innerHTML=`<div class="student-cards" id="drag-container">${students.map(s=>this._cardHTML(s)).join('')}</div>`;
     }
-    this._bindDrag();
+    
+   
     applyRolePermissions();
   },
   _cardHTML(s){
     const color=avatarColor(s.name);
-    return `<div class="student-card" draggable="true" data-id="${s.id}" id="sc-${s.id}">
-      <div class="sc-drag-handle" title="Drag to reorder"><i class="ti ti-grip-vertical"></i></div>
+    
+    return `<div class="student-card" data-id="${s.id}" id="sc-${s.id}">
       <div class="sc-avatar" style="background:${color}22;color:${color};border-color:${color}55">${initials(s.name)}</div>
       <div class="sc-info">
         <div class="sc-name">${s.name}</div>
@@ -2146,44 +2146,6 @@ const Students={
         <button class="sc-btn del-btn" onclick="Students.delete('${s.id}')"><i class="ti ti-trash"></i><span class="btn-text"> Del</span></button>
       </div>
     </div>`;
-  },
-  _bindDrag(){
-    const container=document.getElementById('drag-container');if(!container)return;
-    const cards=container.querySelectorAll('.student-card');
-    cards.forEach(card=>{
-      card.addEventListener('dragstart',e=>{this._dragSrc=card.dataset.id;card.classList.add('dragging');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',card.dataset.id);});
-      card.addEventListener('dragend',()=>{card.classList.remove('dragging');container.querySelectorAll('.student-card').forEach(c=>c.classList.remove('drag-over'));});
-      card.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';card.classList.add('drag-over');});
-      card.addEventListener('dragleave',()=>card.classList.remove('drag-over'));
-      card.addEventListener('drop',e=>{
-        e.preventDefault();card.classList.remove('drag-over');
-        const srcId=e.dataTransfer.getData('text/plain');const dstId=card.dataset.id;if(srcId===dstId)return;
-        const cs=State.students.filter(s=>s.classId===State.currentClassId);
-        const ot=State.students.filter(s=>s.classId!==State.currentClassId);
-        const si=cs.findIndex(s=>s.id===srcId),di=cs.findIndex(s=>s.id===dstId);if(si<0||di<0)return;
-        const[m]=cs.splice(si,1);cs.splice(di,0,m);State.students=[...ot,...cs];saveAll();this.render();toast('Order updated');
-      });
-    });
-    let touchSrc=null,touchClone=null;
-    cards.forEach(card=>{
-      card.addEventListener('touchstart',e=>{
-        touchSrc=card.dataset.id;card.classList.add('dragging');
-        touchClone=card.cloneNode(true);
-        touchClone.style.cssText=`position:fixed;opacity:.7;pointer-events:none;z-index:9999;width:${card.offsetWidth}px;transition:none;border:2px solid var(--indigo)`;
-        document.body.appendChild(touchClone);
-      },{passive:true});
-      card.addEventListener('touchmove',e=>{if(!touchClone)return;const t=e.touches[0];touchClone.style.left=(t.clientX-touchClone.offsetWidth/2)+'px';touchClone.style.top=(t.clientY-50)+'px';},{passive:true});
-      card.addEventListener('touchend',e=>{
-        if(touchClone){document.body.removeChild(touchClone);touchClone=null;}
-        const t=e.changedTouches[0];const el=document.elementFromPoint(t.clientX,t.clientY);
-        const dstCard=el?.closest('.student-card');
-        if(dstCard&&touchSrc){
-          const dstId=dstCard.dataset.id;const srcId=touchSrc;
-          if(srcId!==dstId){const cs=State.students.filter(s=>s.classId===State.currentClassId);const ot=State.students.filter(s=>s.classId!==State.currentClassId);const si=cs.findIndex(s=>s.id===srcId),di=cs.findIndex(s=>s.id===dstId);if(si>=0&&di>=0){const[m]=cs.splice(si,1);cs.splice(di,0,m);State.students=[...ot,...cs];saveAll();this.render();toast('Order updated');}}
-        }
-        touchSrc=null;document.querySelectorAll('.student-card').forEach(c=>c.classList.remove('dragging'));
-      });
-    });
   },
   openAddModal(){
     if(!State.currentClassId)return toast('Select a class first','err');
@@ -2666,7 +2628,7 @@ const ProfileModal={
     document.getElementById('pm-department').value = u.department || '';
     document.getElementById('pm-phone').value = u.phone || '';
     document.getElementById('pm-alt-email').value = u.altEmail || '';
-    document.getElementById('pm-theme').value = u.theme || 'dark';
+    document.getElementById('pm-theme').value = u.theme || 'light';
 
     const note=document.getElementById('pm-lock-note');
     const btn=document.getElementById('pm-save-btn');
