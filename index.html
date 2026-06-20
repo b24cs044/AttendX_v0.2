@@ -835,11 +835,14 @@ tbody tr:hover td{background:rgba(255,255,255,.015)}
       </div>
       <div id="import-preview"></div>
       <div class="section-divider">Sample CSV (TMSS Internship 2026 — batch_2)</div>
-      <pre class="sample-csv">name,roll_number,student_id,mobile,email,parent_mobile,parent_telegram,parent_email,class_sem,section,department
-Hemanth,B2-01,TMSS2601,+91 9100380591,hemanth@tmss.edu,+91 9100380591,@hemanth_parent,hemanth.parent@gmail.com,Sem 3,A,CSE
-Rahul Das,B2-02,TMSS2602,+91 9862057289,rahul@tmss.edu,+91 9862057289,@rahul_parent,rahul.parent@gmail.com,Sem 3,A,CSE
-...
-</pre>
+      <pre class="sample-csv">name,roll_number,student_id,mobile,email,parent_mobile,parent_telegram,parent_email
+K.Hemanth,B2-01,TMSS2601,+91 9100380591,hemanth@tmss.edu,+91 9100380591,@hemanth_parent,hemanth.parent@gmail.com
+Rahul Das,B2-02,TMSS2602,+91 9862057289,rahul@tmss.edu,+91 9862057289,@rahul_parent,rahul.parent@gmail.com
+Rishab,B2-03,TMSS2603,+91 9863475903,rishab@tmss.edu,+91 9863475903,@rishab_parent,rishab.parent@gmail.com
+Sumit,B2-04,TMSS2604,+91 8937041361,sumit@tmss.edu,+91 8937041361,@sumit_parent,sumit.parent@gmail.com
+Sheikh Thanveer,B2-05,TMSS2605,+91 8309764404,thanveer@tmss.edu,+91 8309764404,@thanveer_parent,thanveer.parent@gmail.com
+Purushottam Thakur,B2-06,TMSS2606,+91 7070384853,purushottam@tmss.edu,+91 7070384853,@purushottam_parent,purushottam.parent@gmail.com
+Shyam,B2-07,TMSS2607,+91 7893281282,shyam@tmss.edu,+91 7893281282,@shyam_parent,shyam.parent@gmail.com</pre>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="Modals.close('import')">Cancel</button>
@@ -958,7 +961,8 @@ const State={
   classes:[], students:[], records:[],
   subjects:['General','Mathematics','Science','English','History','Computer Science','Art & Design','Physical Education'],
   threshold:75, currentClassId:null, attendance:{}, csvPreviewData:[],
-  studentsGrouped:false, _exportContext:'records'
+  studentsGrouped:false, _exportContext:'records',
+  orgData: { departments: [], classes: [], sections: [] }
 };
 
 /* ── API Integration ── */
@@ -1001,6 +1005,7 @@ function saveAll(){
   DB.set('students',State.students);
   DB.set('records',State.records);
   DB.set('subjects',State.subjects);
+  DB.set('orgData',State.orgData);
 }
 
 /* ── Toast ── */
@@ -1293,6 +1298,7 @@ const Auth={
   async _syncWithBackend() {
     if (!navigator.onLine) return;
     try {
+      // 1. Sync Students
       const stuRes = await API.get('students');
       if (stuRes && stuRes.success && stuRes.data) {
           State.students = stuRes.data;
@@ -1300,11 +1306,22 @@ const Auth={
           if (App._current === 'students') Students.render();
           if (App._current === 'register') Register.render();
       }
+      
+      // 2. Sync Organization Data
+      const orgRes = await API.get('getOrganization'); 
+      if (orgRes && orgRes.success) {
+          State.orgData = {
+              departments: orgRes.departments || [],
+              classes: orgRes.classes || [],
+              sections: orgRes.sections || []
+          };
+          DB.set('orgData', State.orgData); // Save offline
+      }
     } catch(e) {
       console.error("Sync failed", e);
     }
   },
-  
+
   logout(){
     Confirm.show('Sign out?',()=>{
       State.loggedIn=false;State.currentUser=null;
@@ -1329,6 +1346,7 @@ const Auth={
     State.subjects=DB.get('subjects',['General','Mathematics','Science','English','Computer Science','Physics','Chemistry','Art & Design']);
     State.threshold=DB.get('threshold',75);
     Analytics.threshold=State.threshold;
+    State.orgData = DB.get('orgData', { departments: [], classes: [], sections: [] });
   },
   
   _bootApp(){
@@ -2225,66 +2243,31 @@ const Students={
   dragLeave(){document.getElementById('import-drop-zone').classList.remove('drag-over');},
   dropFile(e){e.preventDefault();this.dragLeave();const f=e.dataTransfer.files[0];if(f)this.parseCSV(f);},
   handleCsvFile(input){if(input.files[0])this.parseCSV(input.files[0]);},
-  parseCSV(file) {
-  if (!file.name.toLowerCase().endsWith('.csv') && file.type !== 'text/csv')
-    return toast('Select a CSV file', 'err');
-
-  const reader = new FileReader();
-  reader.onload = e => {
-    // ── robust CSV line/field splitter ──────────────────────────────
-    function splitCSVLine(line) {
-      const fields = [];
-      let cur = '', inQ = false;
-      for (let i = 0; i < line.length; i++) {
-        const ch = line[i];
-        if (ch === '"') {
-          // escaped quote inside a quoted field
-          if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
-          else inQ = !inQ;
-        } else if (ch === ',' && !inQ) {
-          fields.push(cur.trim()); cur = '';
-        } else {
-          cur += ch;
-        }
+  parseCSV(file){
+    if(!file.name.toLowerCase().endsWith('.csv')&&file.type!=='text/csv')return toast('Select a CSV file','err');
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const lines=e.target.result.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+      if(lines.length<2)return toast('CSV is empty','err');
+      const headers=lines[0].split(',').map(h=>h.toLowerCase().trim().replace(/^"|"$/g,''));
+      if(!headers.includes('name'))return toast('CSV must have a "name" column','err');
+      const rows=[];
+      for(let i=1;i<lines.length;i++){
+        const cols=lines[i].split(',').map(c=>c.trim().replace(/^"|"$/g,''));
+        const row={};headers.forEach((h,idx)=>{row[h]=cols[idx]||'';});if(row.name)rows.push(row);
       }
-      fields.push(cur.trim());
-      return fields;
-    }
-
-    const lines = e.target.result.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    if (lines.length < 2) return toast('CSV is empty', 'err');
-
-    const headers = splitCSVLine(lines[0]).map(h => h.toLowerCase().replace(/^"|"$/g, '').trim());
-    if (!headers.includes('name')) return toast('CSV must have a "name" column', 'err');
-
-    const rows = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols = splitCSVLine(lines[i]);
-      const row = {};
-      headers.forEach((h, idx) => { row[h] = cols[idx] || ''; });
-      if (row.name) rows.push(row);
-    }
-
-    State.csvPreviewData = rows;
-    document.getElementById('import-preview').innerHTML = `
-      <div style="margin-top:13px;font-size:.8rem;color:var(--text2);margin-bottom:7px">Found <strong style="color:var(--text)">${rows.length}</strong> student(s):</div>
-      <div class="import-preview-table"><div class="table-card"><table>
-        <thead><tr><th>Name</th><th>Roll</th><th>ID</th><th>Mobile</th><th>Sem/Class</th><th>Section</th><th>Dept</th></tr></thead>
-        <tbody>${rows.slice(0, 8).map(r => `<tr>
-          <td>${r.name || '—'}</td>
-          <td class="td-mono">${r.roll_number || '—'}</td>
-          <td class="td-mono">${r.student_id || '—'}</td>
-          <td>${r.mobile || '—'}</td>
-          <td>${r.class_sem || '—'}</td>
-          <td>${r.section || '—'}</td>
-          <td>${r.department || '—'}</td>
-        </tr>`).join('')}
-        ${rows.length > 8 ? `<tr><td colspan="7" style="text-align:center;color:var(--text3);font-size:.76rem">…and ${rows.length - 8} more</td></tr>` : ''}
-        </tbody></table></div></div>`;
-    document.getElementById('btn-import-confirm').style.display = 'inline-flex';
-  };
-  reader.readAsText(file);
-},
+      State.csvPreviewData=rows;
+      document.getElementById('import-preview').innerHTML=`
+        <div style="margin-top:13px;font-size:.8rem;color:var(--text2);margin-bottom:7px">Found <strong style="color:var(--text)">${rows.length}</strong> student(s):</div>
+        <div class="import-preview-table"><div class="table-card"><table>
+          <thead><tr><th>Name</th><th>Roll</th><th>ID</th><th>Mobile</th><th>Sem/Class</th><th>Section</th><th>Dept</th></tr></thead>
+          <tbody>${rows.slice(0,8).map(r=>`<tr><td>${r.name||'—'}</td><td class="td-mono">${r.roll_number||'—'}</td><td class="td-mono">${r.student_id||'—'}</td><td>${r.mobile||'—'}</td><td>${r.class_sem||'—'}</td><td>${r.section||'—'}</td><td>${r.department||'—'}</td></tr>`).join('')}
+          ${rows.length>8?`<tr><td colspan="7" style="text-align:center;color:var(--text3);font-size:.76rem">…and ${rows.length-8} more</td></tr>`:''}
+          </tbody></table></div></div>`;
+      document.getElementById('btn-import-confirm').style.display='inline-flex';
+    };
+    reader.readAsText(file);
+  },
   confirmImport(){
     let newStudents = [];
     let skipped = [];
