@@ -688,6 +688,7 @@ tbody tr:hover td{background:rgba(255,255,255,.015)}
         <button class="tab-btn active" data-tab="institutions" onclick="ManageView.openTab('institutions')"><i class="ti ti-building-school"></i> Institutions</button>
         <button class="tab-btn" data-tab="branches" onclick="ManageView.openTab('branches')"><i class="ti ti-git-branch"></i> Branch/Dept</button>
         <button class="tab-btn" data-tab="classes" onclick="ManageView.openTab('classes')"><i class="ti ti-layout-grid"></i> Class/Section</button>
+        <button class="tab-btn" data-tab="master" onclick="ManageView.openTab('master')"><i class="ti ti-database"></i> Master Data</button>
       </div>
       <div id="manage-content"></div>
     </section>
@@ -954,12 +955,15 @@ const csvQ=v=>`"${String(v||'').replace(/"/g,'""')}"`;
 const fmtPct=(present,total,decimals=1)=>total===0?'—':(present/total*100).toFixed(decimals)+'%';
 
 /* ── State ── */
+/* ── State ── */
 const State={
   users:[], loggedIn:false, currentUser:null,
   institutions:[], activeInstitutionId:null,
   branches:[], activeBranchId:null,
   classes:[], students:[], records:[],
+  
   categories: [], subCategories: [], subSubCategories: [],
+  
   subjects:['General','Mathematics','Science','English','History','Computer Science','Art & Design','Physical Education'],
   threshold:75, currentClassId:null, attendance:{}, csvPreviewData:[],
   studentsGrouped:false, _exportContext:'records'
@@ -1300,7 +1304,7 @@ const Auth={
   async _syncWithBackend() {
     if (!navigator.onLine) return;
     try {
-      // 1. Sync Students
+      // Fetch Students
       const stuRes = await API.get('students');
       if (stuRes && stuRes.success && stuRes.data) {
           State.students = stuRes.data;
@@ -1308,21 +1312,26 @@ const Auth={
           if (App._current === 'students') Students.render();
           if (App._current === 'register') Register.render();
       }
+
       
-      // 2. Sync Organization Data
-      const orgRes = await API.get('getOrganization'); 
-      if (orgRes && orgRes.success) {
-          if (orgRes.institutions && orgRes.institutions.length) State.institutions = orgRes.institutions;
-          if (orgRes.branches && orgRes.branches.length) State.branches = orgRes.branches;
-          if (orgRes.classes && orgRes.classes.length) State.classes = orgRes.classes;
-          
-          DB.set('institutions', State.institutions);
-          DB.set('branches', State.branches);
-          DB.set('classes', State.classes);
-          
-          if (App._current === 'manage') ManageView.render();
-          App._buildClassSelector(App._current);
+      const catRes = await API.get('getCategories');
+      if (catRes && catRes.success && catRes.data) {
+          State.categories = catRes.data;
+          DB.set('categories', State.categories);
       }
+
+      const subCatRes = await API.get('getSubCategories');
+      if (subCatRes && subCatRes.success && subCatRes.data) {
+          State.subCategories = subCatRes.data;
+          DB.set('subCategories', State.subCategories);
+      }
+
+      const subSubCatRes = await API.get('getSubSubCategories');
+      if (subSubCatRes && subSubCatRes.success && subSubCatRes.data) {
+          State.subSubCategories = subSubCatRes.data;
+          DB.set('subSubCategories', State.subSubCategories);
+      }
+      
     } catch(e) {
       console.error("Sync failed", e);
     }
@@ -1358,7 +1367,7 @@ _loadData(){
     State.threshold=DB.get('threshold',75);
     Analytics.threshold=State.threshold;
   },
-  
+
   _bootApp(){
     document.getElementById('screen-login').classList.remove('active');
     document.getElementById('screen-setup').classList.remove('active');
@@ -1721,7 +1730,48 @@ const ManageView={
     const el=document.getElementById('manage-content');
     if(this._tab==='institutions')this._renderInstitutions(el);
     else if(this._tab==='branches')this._renderBranches(el);
-    else this._renderClasses(el);
+    else if(this._tab==='classes')this._renderClasses(el);
+    else this._renderMasterData(el); // NEW ROUTE
+  },
+  
+  // NEW: RENDER MASTER DATA UPLOAD UI
+  _renderMasterData(el){
+    el.innerHTML=`
+      <div class="manage-section">
+        <div class="manage-section-header">
+          <div class="manage-section-title"><i class="ti ti-database"></i> Import Master Data</div>
+        </div>
+        <p style="font-size:.8rem;color:var(--text2);margin-bottom:15px">Upload CSV files to bulk-import Categories, Sub-Categories, and Sub-Sub-Categories.</p>
+        
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--r8);">
+            <div>
+              <div style="font-weight:600; font-size:.86rem;">1. Categories</div>
+              <div style="font-size:.72rem; color:var(--text3);">Requires headers: category_id, name, short_name</div>
+            </div>
+            <button class="btn btn-sm btn-primary" onclick="document.getElementById('csv-cat').click()"><i class="ti ti-upload"></i> Upload</button>
+            <input type="file" id="csv-cat" accept=".csv" style="display:none" onchange="uploadMasterDataCSV(this, 'category')">
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--r8);">
+            <div>
+              <div style="font-weight:600; font-size:.86rem;">2. Sub-Categories</div>
+              <div style="font-size:.72rem; color:var(--text3);">Requires headers: sub_category_id, category_id, name</div>
+            </div>
+            <button class="btn btn-sm btn-primary" onclick="document.getElementById('csv-subcat').click()"><i class="ti ti-upload"></i> Upload</button>
+            <input type="file" id="csv-subcat" accept=".csv" style="display:none" onchange="uploadMasterDataCSV(this, 'subcat')">
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--r8);">
+            <div>
+              <div style="font-weight:600; font-size:.86rem;">3. Sub-Sub-Categories</div>
+              <div style="font-size:.72rem; color:var(--text3);">Requires headers: sub_sub_category_id, sub_category_id, category_id, name</div>
+            </div>
+            <button class="btn btn-sm btn-primary" onclick="document.getElementById('csv-subsubcat').click()"><i class="ti ti-upload"></i> Upload</button>
+            <input type="file" id="csv-subsubcat" accept=".csv" style="display:none" onchange="uploadMasterDataCSV(this, 'subsubcat')">
+          </div>
+        </div>
+      </div>`;
   },
   _renderInstitutions(el){
     const list=State.institutions;
@@ -2635,6 +2685,49 @@ const Alerts={
   },
   mockSend(){Modals.close('alert');toast('Alert sent (mock)!');}
 };
+
+/* ── Master Data Uploader ── */
+function uploadMasterDataCSV(fileInput, type) {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const text = e.target.result;
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) return toast('CSV is empty or invalid', 'err');
+    
+    const headers = lines[0].split(',').map(h => h.toLowerCase().trim().replace(/^"|"$/g,''));
+    
+    const dataArray = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g,''));
+      const row = {};
+      headers.forEach((h, idx) => { row[h] = cols[idx] || ''; });
+      dataArray.push(row);
+    }
+
+    // Map the type to the correct Google Apps Script endpoint
+    let endpoint = "";
+    if (type === 'category') endpoint = 'importCategories';
+    if (type === 'subcat') endpoint = 'importSubCategories';
+    if (type === 'subsubcat') endpoint = 'importSubSubCategories';
+
+    toast(`Uploading ${dataArray.length} records to database...`);
+    const res = await API.post(endpoint, dataArray);
+    
+    if (res && res.success) {
+      toast('Upload complete! Syncing new data...', 'success');
+      Auth._syncWithBackend(); // Reload the data so the app has the new arrays
+    } else {
+      toast('Upload failed.', 'err');
+    }
+    
+    fileInput.value = ''; // Reset the file input so it can be used again
+  };
+  
+  reader.readAsText(file);
+}
 
 /* ══ PROFILE MODAL ══ */
 const ProfileModal={
