@@ -959,10 +959,10 @@ const State={
   institutions:[], activeInstitutionId:null,
   branches:[], activeBranchId:null,
   classes:[], students:[], records:[],
+  categories: [], subCategories: [], subSubCategories: [],
   subjects:['General','Mathematics','Science','English','History','Computer Science','Art & Design','Physical Education'],
   threshold:75, currentClassId:null, attendance:{}, csvPreviewData:[],
-  studentsGrouped:false, _exportContext:'records',
-  orgData: { departments: [], classes: [], sections: [] }
+  studentsGrouped:false, _exportContext:'records'
 };
 
 /* ── API Integration ── */
@@ -1005,7 +1005,9 @@ function saveAll(){
   DB.set('students',State.students);
   DB.set('records',State.records);
   DB.set('subjects',State.subjects);
-  DB.set('orgData',State.orgData);
+  DB.set('categories', State.categories);
+  DB.set('subCategories', State.subCategories);
+  DB.set('subSubCategories', State.subSubCategories);
 }
 
 /* ── Toast ── */
@@ -1310,12 +1312,16 @@ const Auth={
       // 2. Sync Organization Data
       const orgRes = await API.get('getOrganization'); 
       if (orgRes && orgRes.success) {
-          State.orgData = {
-              departments: orgRes.departments || [],
-              classes: orgRes.classes || [],
-              sections: orgRes.sections || []
-          };
-          DB.set('orgData', State.orgData); // Save offline
+          if (orgRes.institutions && orgRes.institutions.length) State.institutions = orgRes.institutions;
+          if (orgRes.branches && orgRes.branches.length) State.branches = orgRes.branches;
+          if (orgRes.classes && orgRes.classes.length) State.classes = orgRes.classes;
+          
+          DB.set('institutions', State.institutions);
+          DB.set('branches', State.branches);
+          DB.set('classes', State.classes);
+          
+          if (App._current === 'manage') ManageView.render();
+          App._buildClassSelector(App._current);
       }
     } catch(e) {
       console.error("Sync failed", e);
@@ -1335,7 +1341,7 @@ const Auth={
     },'Sign Out');
   },
   
-  _loadData(){
+_loadData(){
     State.institutions=DB.get('institutions',[]);
     State.activeInstitutionId=DB.get('activeInstitutionId',null);
     State.branches=DB.get('branches',[]);
@@ -1343,10 +1349,14 @@ const Auth={
     State.classes=DB.get('classes',[]);
     State.students=DB.get('students',[]);
     State.records=DB.get('records',[]);
+    // --- NEW MASTER DATA LOAD ---
+    State.categories = DB.get('categories', []);
+    State.subCategories = DB.get('subCategories', []);
+    State.subSubCategories = DB.get('subSubCategories', []);
+    // ----------------------------
     State.subjects=DB.get('subjects',['General','Mathematics','Science','English','Computer Science','Physics','Chemistry','Art & Design']);
     State.threshold=DB.get('threshold',75);
     Analytics.threshold=State.threshold;
-    State.orgData = DB.get('orgData', { departments: [], classes: [], sections: [] });
   },
   
   _bootApp(){
@@ -1817,6 +1827,7 @@ const ManageView={
       State.institutions.push(inst);
       if(!State.activeInstitutionId)State.activeInstitutionId=inst.id;
       saveAll();Modals.close('generic');this.render();updateHomeContext();toast('Institution added');
+      API.post('saveInstitution', inst);
     };
     Modals.open('generic');
   },
@@ -1839,6 +1850,7 @@ const ManageView={
       if(!name)return toast('Name required','err');
       inst.name=name;inst.color=document.getElementById('gm-color').value;
       saveAll();Modals.close('generic');this.render();updateHomeContext();toast('Institution updated');
+      API.post('saveInstitution', inst);
     };
     Modals.open('generic');
   },
@@ -1852,6 +1864,7 @@ const ManageView={
       State.records=State.records.filter(r=>r.institutionId!==id);
       if(State.activeInstitutionId===id)State.activeInstitutionId=State.institutions[0]?.id||null;
       saveAll();this.render();updateHomeContext();toast('Institution deleted');
+      API.post('deleteInstitution', { id });
     },'Delete');
   },
   setActiveInstitution(id){
@@ -1881,6 +1894,7 @@ const ManageView={
       State.branches.push(br);
       if(!State.activeBranchId)State.activeBranchId=br.id;
       saveAll();Modals.close('generic');this.render();updateHomeContext();toast('Branch added');
+      API.post('saveBranch', br);
     };
     Modals.open('generic');
   },
@@ -1903,6 +1917,7 @@ const ManageView={
       if(!name)return toast('Name required','err');
       br.name=name;br.color=document.getElementById('gm-color').value;
       saveAll();Modals.close('generic');this.render();updateHomeContext();toast('Branch updated');
+      API.post('saveBranch', br);
     };
     Modals.open('generic');
   },
@@ -1914,6 +1929,7 @@ const ManageView={
       State.records=State.records.filter(r=>r.branchId!==id);
       if(State.activeBranchId===id)State.activeBranchId=State.branches.find(b=>b.institutionId===State.activeInstitutionId)?.id||null;
       saveAll();this.render();updateHomeContext();toast('Branch deleted');
+      API.post('deleteBranch', { id });
     },'Delete');
   },
   setActiveBranch(id){
@@ -1971,6 +1987,7 @@ const Classes={
     if(App._current)App._buildClassSelector(App._current);
     if(document.getElementById('view-manage').classList.contains('active'))ManageView.render();
     toast('Class saved');
+    API.post('saveClass', targetClass);
   },
   confirmDelete(){
     const id=document.getElementById('edit-class-id').value;
