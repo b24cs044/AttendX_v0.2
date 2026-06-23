@@ -2693,37 +2693,44 @@ function uploadMasterDataCSV(fileInput, type) {
 
   const reader = new FileReader();
   reader.onload = async (e) => {
-    const text = e.target.result;
-    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    if (lines.length < 2) return toast('CSV is empty or invalid', 'err');
-    
-    const headers = lines[0].split(',').map(h => h.toLowerCase().trim().replace(/^"|"$/g,''));
-    
-    const dataArray = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g,''));
-      const row = {};
-      headers.forEach((h, idx) => { row[h] = cols[idx] || ''; });
-      dataArray.push(row);
-    }
+    try {
+      const text = e.target.result;
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      if (lines.length < 2) return toast('CSV is empty or invalid', 'err');
+      
+      const headers = lines[0].split(',').map(h => h.toLowerCase().trim().replace(/^"|"$/g,''));
+      
+      const dataArray = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g,''));
+        const row = {};
+        headers.forEach((h, idx) => { row[h] = cols[idx] || ''; });
+        dataArray.push(row);
+      }
 
-    // Map the type to the correct Google Apps Script endpoint
-    let endpoint = "";
-    if (type === 'category') endpoint = 'importCategories';
-    if (type === 'subcat') endpoint = 'importSubCategories';
-    if (type === 'subsubcat') endpoint = 'importSubSubCategories';
+      let endpoint = "";
+      if (type === 'category') endpoint = 'importCategories';
+      if (type === 'subcat') endpoint = 'importSubCategories';
+      if (type === 'subsubcat') endpoint = 'importSubSubCategories';
 
-    toast(`Uploading ${dataArray.length} records to database...`);
-    const res = await API.post(endpoint, dataArray);
-    
-    if (res && res.success) {
-      toast('Upload complete! Syncing new data...', 'success');
-      Auth._syncWithBackend(); // Reload the data so the app has the new arrays
-    } else {
-      toast('Upload failed.', 'err');
+      toast(`Uploading ${dataArray.length} records to database...`);
+      const res = await API.post(endpoint, dataArray);
+      
+      if (res && res.success) {
+        toast('Upload complete! Syncing new data...', 'success');
+        Auth._syncWithBackend(); // Reload the data
+      } else {
+        // 🔥 THIS WILL NOW SHOW THE EXACT ERROR ON SCREEN
+        console.error("Backend Error:", res);
+        const errorMsg = res?.message || res?.error || 'Network/CORS error. Did you redeploy the script?';
+        toast('Failed: ' + errorMsg, 'err', 6000); 
+      }
+    } catch(err) {
+      console.error("Parse Error:", err);
+      toast('Failed to parse CSV.', 'err');
+    } finally {
+      fileInput.value = ''; // Reset input
     }
-    
-    fileInput.value = ''; // Reset the file input so it can be used again
   };
   
   reader.readAsText(file);
