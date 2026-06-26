@@ -467,7 +467,12 @@ tbody tr:hover td{background:rgba(255,255,255,.015)}
         <option value="admin">Administrator</option>
       </select>
     </div>
-    
+    <div style="margin:10px 0 15px;">
+      <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--text2);cursor:pointer;">
+      <input type="checkbox" id="rememberMe">
+        Remember me
+      </label>
+    </div>
     <button class="login-btn" id="main-auth-btn" onclick="Auth.submit()"><i class="ti ti-arrow-right"></i> Sign In</button>
     <button class="bio-btn" id="bio-btn" onclick="Auth.biometric()" style="display:none"><i class="ti ti-fingerprint"></i> Use Biometric</button>
     <p class="login-hint" id="auth-toggle">New here? <span style="cursor:pointer" onclick="Auth.toggleMode()">Create an account</span></p>
@@ -1075,6 +1080,22 @@ const Auth={
   
   init(){
     State.users = DB.get('users', []);
+    const session =
+        JSON.parse(localStorage.getItem('AttendXSession')) ||
+        JSON.parse(sessionStorage.getItem('AttendXSession'));
+
+    if (session) {
+        const user = State.users.find(u =>
+            u.username === session.username &&
+            u.role === session.role
+        );
+
+        if (user) {
+            this._enterApp(user);
+            return;
+        }
+    }
+
     if(State.users.length === 0) {
         this.mode = 'register';
     } else {
@@ -1141,7 +1162,22 @@ const Auth={
       return;
     }
 
-    err.style.display='none';
+    err.style.display = 'none';
+
+    const remember = document.getElementById('rememberMe').checked;
+
+    if (remember) {
+        localStorage.setItem('AttendXSession', JSON.stringify({
+            username: user.username,
+            role: user.role
+        }));
+    } else {
+        sessionStorage.setItem('AttendXSession', JSON.stringify({
+            username: user.username,
+            role: user.role
+        }));
+    }
+
     this._enterApp(user);
   },
   
@@ -1350,6 +1386,10 @@ const Auth={
   logout(){
     Confirm.show('Sign out?',()=>{
       State.loggedIn=false;State.currentUser=null;
+
+      localStorage.removeItem("AttendXSession");
+      sessionStorage.removeItem("AttendXSession");
+      
       document.getElementById('app').style.display='none';
       document.getElementById('screen-home').classList.remove('active');
       document.getElementById('screen-login').classList.add('active');
@@ -1357,6 +1397,7 @@ const Auth={
       document.getElementById('login-error').style.display='none';
       this.mode = 'login';
       this._updateAuthUI();
+      
     },'Sign Out');
   },
   
