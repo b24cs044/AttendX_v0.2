@@ -153,6 +153,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);height:100%;
 .profile-btn{position:absolute;top:18px;right:18px;width:38px;height:38px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border2);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text2);transition:all .15s;z-index:10;font-family:var(--mono);font-size:.78rem;font-weight:700;letter-spacing:0;padding:0}
 .profile-btn:hover{border-color:var(--indigo);color:var(--indigo-light);background:var(--indigo-bg)}
 
+.about-btn{position:absolute;top:18px;right:64px;width:38px;height:38px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border2);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text2);transition:all .15s;z-index:10;font-size:1.15rem;padding:0}
+.about-btn:hover{border-color:var(--indigo);color:var(--indigo-light);background:var(--indigo-bg)}
+
 /* ── PROFILE MODAL ── */
 .profile-modal-overlay{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.65);backdrop-filter:blur(5px);display:none;align-items:center;justify-content:center;padding:20px}
 .profile-modal-overlay.open{display:flex}
@@ -491,7 +494,13 @@ tbody tr:hover td{background:rgba(255,255,255,.015)}
 </div>
 
 <div class="screen" id="screen-home" style="position:relative">
+  
+  <button class="about-btn" onclick="Modals.open('about')" title="About AttendX" aria-label="About">
+    <i class="ti ti-info-circle"></i>
+  </button>
+
   <button class="profile-btn" id="home-profile-btn" onclick="ProfileModal.open()" title="Edit profile" aria-label="Profile settings">
+  
     <span id="home-profile-initials">?</span>
   </button>
   <div class="home-wrap">
@@ -556,10 +565,6 @@ tbody tr:hover td{background:rgba(255,255,255,.015)}
     <div class="home-logout">
       <button id="pwa-install-btn" class="pwa-install-btn" style="display:none;" onclick="installPWA()"><i class="ti ti-download"></i> Install App</button>
     </div>
-    <footer class="home-footer">
-      <span>© <span id="footer-year"></span> TechnoMedia Software Solutions Private Limited</span>
-      <span>All rights reserved. Unauthorised use prohibited.</span>
-    </footer>
   </div>
 </div>
 
@@ -938,6 +943,32 @@ Shyam,B2-07,TMSS2607,+91 7893281282,shyam@tmss.edu,+91 7893281282,@shyam_parent,
     <div class="modal-footer">
       <button class="btn" onclick="Modals.close('confirm')">Cancel</button>
       <button class="btn btn-danger" id="confirm-ok">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="overlay-about">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <span class="modal-title">About</span>
+      <button class="icon-btn" onclick="Modals.close('about')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body" style="text-align:center; padding: 26px 20px;">
+      
+      <div class="setup-icon" style="background:var(--indigo-bg); color:var(--indigo-light); margin: 0 auto 16px;">
+        <i class="ti ti-building-office"></i>
+      </div>
+      
+      <h3 style="font-size:1.15rem; font-weight:800; margin-bottom:6px;">TechnoMedia Software Solutions Pvt Ltd</h3>
+      
+      <p style="font-size:0.85rem; color:var(--text2); margin-bottom: 24px; line-height: 1.5;">
+        Empowering education through innovative digital solutions. We specialize in building robust, scalable platforms for modern institutions.
+      </p>
+      
+      <a href="https://example.com" target="_blank" class="btn btn-primary" style="width:100%; text-decoration:none; margin-bottom: 10px; padding: 11px;">
+        <i class="ti ti-external-link"></i> Visit Company Website
+      </a>
+      
     </div>
   </div>
 </div>
