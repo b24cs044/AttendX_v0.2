@@ -958,7 +958,7 @@ const DB={
 };
 
 /* ── Helpers ── */
-const uid=()=>'_'+Math.random().toString(36).substr(2,9);
+const uid=()=> Date.now().toString() + Math.floor(1000 + Math.random() * 9000).toString();
 const fmtDate=d=>d?new Date(d+'T00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'—';
 const fmtDateTime=iso=>{if(!iso)return'—';const d=new Date(iso);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});};
 const initials=n=>(n||'').split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
@@ -1389,7 +1389,7 @@ const Auth={
 
       localStorage.removeItem("AttendXSession");
       sessionStorage.removeItem("AttendXSession");
-      
+
       document.getElementById('app').style.display='none';
       document.getElementById('screen-home').classList.remove('active');
       document.getElementById('screen-login').classList.add('active');
@@ -1409,7 +1409,7 @@ _loadData(){
     State.classes=DB.get('classes',[]);
     State.students=DB.get('students',[]);
     State.records=DB.get('records',[]);
-    // --- NEW MASTER DATA LOAD ---
+    // --- MASTER DATA LOAD ---
     State.categories = DB.get('categories', []);
     State.subCategories = DB.get('subCategories', []);
     State.subSubCategories = DB.get('subSubCategories', []);
