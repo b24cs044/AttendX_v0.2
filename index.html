@@ -1,4 +1,3 @@
-<!-- AttendX-T -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -17,7 +16,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"/>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <style>
 :root{
   --bg:#0f1117;--surface:#161b27;--surface2:#1e2535;--surface3:#263045;
@@ -150,25 +148,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);height:100%;
 .pwa-install-btn:hover{background:var(--indigo) !important;color:#fff !important;}
 .bt-attend-btn{background:rgba(6,182,212,.12) !important;color:#06b6d4 !important;border-color:#06b6d4 !important;font-weight:700;}
 .bt-attend-btn:hover{background:#06b6d4 !important;color:#fff !important;}
-
-/* QR + Proximity Attendance */
-.gp-attend-btn{background:rgba(16,185,129,.12) !important;color:#10b981 !important;border-color:#10b981 !important;font-weight:700;}
-.gp-attend-btn:hover{background:#10b981 !important;color:#fff !important;}
-@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-.prox-step{display:none}
-.prox-step.active{display:block}
-.prox-qr-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r12);margin-bottom:14px}
-.prox-qr-wrap canvas{border-radius:var(--r8);background:#fff;padding:8px}
-.prox-timer{font-family:var(--mono);font-size:1.4rem;font-weight:700;color:var(--indigo-light)}
-.prox-link-row{display:flex;gap:7px;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r8);padding:8px 10px;font-size:.72rem;color:var(--text2);word-break:break-all}
-.prox-stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
-.prox-stat{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r8);padding:10px;text-align:center}
-.prox-stat-val{font-size:1.15rem;font-weight:800}
-.prox-stat-label{font-size:.66rem;color:var(--text3);text-transform:uppercase;letter-spacing:.03em}
-.prox-status-badge{display:inline-flex;align-items:center;gap:5px;font-size:.7rem;font-weight:700;padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.03em}
-.prox-status-badge.active{background:var(--green-bg);color:var(--green)}
-.prox-status-badge.expired{background:var(--red-bg);color:var(--red)}
-.prox-error-box{background:var(--red-bg);color:var(--red);border-radius:var(--r8);padding:11px;font-size:.8rem;margin-bottom:12px;display:flex;gap:8px;align-items:flex-start}
 
 /* ── PROFILE BUTTON ── */
 .profile-btn{position:absolute;top:18px;right:18px;width:38px;height:38px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border2);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text2);transition:all .15s;z-index:10;font-family:var(--mono);font-size:.78rem;font-weight:700;letter-spacing:0;padding:0}
@@ -579,12 +558,8 @@ tbody tr:hover td{background:rgba(255,255,255,.015)}
         <i class="ti ti-bluetooth"></i> Bluetooth Attendance
       </a>
     </div> -->
+ 
 
-    <div style="width:100%;margin-bottom:10px">
-      <button class="btn gp-attend-btn" style="width:100%;justify-content:center;padding:13px;border-radius:var(--r10);font-size:.95rem;display:flex;align-items:center;gap:9px" onclick="ProximitySession.open()">
-        <i class="ti ti-map-pin-check"></i> QR + Proximity Attendance
-      </button>
-    </div>
 
     <div class="home-logout">
       <button id="pwa-install-btn" class="pwa-install-btn" style="display:none;" onclick="installPWA()"><i class="ti ti-download"></i> Install App</button>
@@ -916,95 +891,6 @@ Shyam,B2-07,TMSS2607,+91 7893281282,shyam@tmss.edu,+91 7893281282,@shyam_parent,
   </div>
 </div>
 
-<div class="modal-overlay" id="overlay-proximity">
-  <div class="modal modal-lg">
-    <div class="modal-header">
-      <span class="modal-title"><i class="ti ti-map-pin-check"></i>&nbsp; QR + Proximity Attendance</span>
-      <button class="icon-btn" onclick="ProximitySession.close()"><i class="ti ti-x"></i></button>
-    </div>
-    <div class="modal-body">
-
-      <div class="prox-step active" id="prox-step-setup">
-        <div id="prox-setup-error" class="prox-error-box" style="display:none"></div>
-        <div class="form-group" style="margin-bottom:11px">
-          <label class="form-label">Class *</label>
-          <select id="prox-class-select" class="form-input"></select>
-        </div>
-        <div class="form-grid-2">
-          <div class="form-group">
-            <label class="form-label">Subject code (for AttendX-S matching)</label>
-            <input type="text" id="prox-subject-code" class="form-input" placeholder="e.g. CS204"/>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Session title</label>
-            <input type="text" id="prox-title" class="form-input" placeholder="e.g. Morning Lecture"/>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Radius (meters)</label>
-            <input type="number" id="prox-radius" class="form-input" value="75" min="10" max="500"/>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Session duration (minutes)</label>
-            <input type="number" id="prox-duration" class="form-input" value="10" min="1" max="120"/>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Max location accuracy (meters)</label>
-            <input type="number" id="prox-accuracy" class="form-input" value="50" min="5" max="200"/>
-          </div>
-        </div>
-        <p style="font-size:.74rem;color:var(--text3);margin-top:4px">
-          Starting a session will request your device's GPS location and generate a QR code for students to scan within range. The subject code should match the student app's timetable code (e.g. CS204) so it shows up automatically in their Mark Attendance screen.
-        </p>
-      </div>
-
-      <div class="prox-step" id="prox-step-loading" style="text-align:center;padding:30px 10px">
-        <i class="ti ti-loader-2" style="font-size:2rem;color:var(--indigo-light);animation:spin 1s linear infinite"></i>
-        <p style="margin-top:12px;font-size:.85rem;color:var(--text2)" id="prox-loading-msg">Capturing your location…</p>
-      </div>
-
-      <div class="prox-step" id="prox-step-active">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-          <span class="prox-status-badge active" id="prox-status-badge"><i class="ti ti-circle-filled" style="font-size:.5rem"></i> Active</span>
-          <span class="prox-timer" id="prox-timer">--:--</span>
-        </div>
-        <div class="prox-qr-wrap">
-          <canvas id="prox-qr-canvas"></canvas>
-          <div style="font-size:.78rem;font-weight:600" id="prox-session-title">—</div>
-          <div style="font-size:.72rem;color:var(--text3)" id="prox-session-meta">—</div>
-        </div>
-        <div class="prox-link-row">
-          <i class="ti ti-link"></i>
-          <span id="prox-join-link" style="flex:1"></span>
-          <button class="btn btn-sm" onclick="ProximitySession.copyLink()"><i class="ti ti-copy"></i></button>
-        </div>
-        <div class="prox-stats-grid">
-          <div class="prox-stat"><div class="prox-stat-val" id="prox-stat-marked">0</div><div class="prox-stat-label">Marked</div></div>
-          <div class="prox-stat"><div class="prox-stat-val" style="color:var(--green)" id="prox-stat-accepted">0</div><div class="prox-stat-label">Accepted</div></div>
-          <div class="prox-stat"><div class="prox-stat-val" style="color:var(--red)" id="prox-stat-rejected">0</div><div class="prox-stat-label">Rejected</div></div>
-        </div>
-        <p style="font-size:.7rem;color:var(--text3)" id="prox-demo-note"></p>
-      </div>
-
-      <div class="prox-step" id="prox-step-error">
-        <div class="prox-error-box" id="prox-error-msg"></div>
-      </div>
-
-    </div>
-    <div class="modal-footer" id="prox-footer-setup">
-      <button class="btn" onclick="ProximitySession.close()">Cancel</button>
-      <button class="btn btn-primary" onclick="ProximitySession.start()"><i class="ti ti-map-pin-check"></i> Start Session</button>
-    </div>
-    <div class="modal-footer" id="prox-footer-active" style="display:none">
-      <button class="btn" onclick="ProximitySession.close()">Minimize</button>
-      <button class="btn btn-danger" onclick="ProximitySession.endSession()"><i class="ti ti-square-rounded-x"></i> End Session</button>
-    </div>
-    <div class="modal-footer" id="prox-footer-error" style="display:none">
-      <button class="btn" onclick="ProximitySession.close()">Close</button>
-      <button class="btn btn-primary" onclick="ProximitySession.retry()"><i class="ti ti-refresh"></i> Try Again</button>
-    </div>
-  </div>
-</div>
-
 <div class="modal-overlay" id="overlay-generic">
   <div class="modal modal-sm">
     <div class="modal-header">
@@ -1133,9 +1019,6 @@ const State={
 };
 
 /* ── API Integration ── */
-// ⚠ IMPORTANT: this must be the SAME Web App URL used in AttendX-S's
-// `window.ATTEND_X_CONFIG.gasUrl` — both apps must point at one shared
-// deployment of the gas-backend/*.gs files for real-time session sync to work.
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwGVgEYYr-WUfXQpUzs8cBOLmdLYnDEpBPkhehjKMQLyRfAXP3GmU4e4b4QzODvXxt1/exec';
 
 const API = {
@@ -1798,227 +1681,6 @@ const TeacherAnalytics = {
         </div>
       </div>
     `;
-  }
-};
-
-/* ── QR + Proximity Attendance (AttendX-T) ──────────────────────────────
-   Implements Stage 1 (Feature Resolution), Stage 2 (Teacher Session
-   Creation) and Stage 3/5 (QR Distribution + live status) from the
-   AttendX "QR + Proximity Attendance" spec, for the teacher/admin side.
-
-   Expected backend (GAS) actions — wire these up on the Apps Script side:
-     POST action=createProximitySession
-       payload: {classId, className, title, teacherId, teacherName, mode,
-                 lat, lng, accuracy, radiusMeters, maxAccuracyMeters,
-                 requireQRCodeScan, allowManualOverride,
-                 sessionExpiryMinutes, createdAt}
-       returns: {success, sessionId, joinUrl, expiresAt}
-     GET  action=getProximitySessionStatus&sessionId=...
-       returns: {success, status, marked, accepted, rejected}
-     POST action=closeProximitySession
-       payload: {sessionId}
-       returns: {success}
-
-   If these actions aren't available yet (offline, or backend not wired),
-   the module falls back to a local "demo mode" session (mirrors the
-   DEMO_MODE fallback pattern used elsewhere) so the teacher-side flow can
-   still be fully demoed: GPS capture -> session -> QR -> timer. Live
-   marked/accepted/rejected counts only populate once the real backend
-   endpoints above are implemented, since the frontend must never be the
-   final authority on attendance acceptance. */
-const ProximityConfig={
-  ATTENDX_PROXIMITY_ATTENDANCE_ENABLED:true,   // global feature flag (Sec 6.1)
-  allowProximityAttendance:true,               // org-level toggle (Sec 6.2)
-  allowQRCodeAttendance:true,
-  allowQRProximityHybrid:true,
-  attendanceMode:'QR_PROXIMITY',               // session-level mode (Sec 6.3)
-  requireQRCodeScan:true,                      // policy variables (Sec 6.4)
-  allowManualOverride:false,
-  allowReattemptOnFailure:true,
-  maxAttendanceAttempts:3,
-  locationSampleCount:1,
-  strictServerValidation:true,
-  preventDuplicateAttendance:true,
-  enableAttendanceAuditLog:true
-};
-
-const ProximitySession={
-  _session:null,_timerInt:null,_pollInt:null,
-
-  /* Stage 1 — Feature Resolution */
-  open(){
-    if(!ProximityConfig.ATTENDX_PROXIMITY_ATTENDANCE_ENABLED||!ProximityConfig.allowProximityAttendance){
-      toast('QR + Proximity Attendance is currently disabled','err');return;
-    }
-    const classes=State.classes.filter(c=>c.institutionId===State.activeInstitutionId&&c.branchId===State.activeBranchId);
-    if(!classes.length){toast('Add a class first — go to Manage','err');return;}
-    const sel=document.getElementById('prox-class-select');
-    sel.innerHTML=classes.map(c=>`<option value="${c.id}">${c.name}${c.subject?' · '+c.subject:''}</option>`).join('');
-    if(State.currentClassId&&classes.some(c=>c.id===State.currentClassId))sel.value=State.currentClassId;
-    sel.onchange=()=>{
-      const cls=State.classes.find(c=>c.id===sel.value);
-      document.getElementById('prox-subject-code').value=cls?.subject||'';
-    };
-    const firstCls=State.classes.find(c=>c.id===sel.value);
-    document.getElementById('prox-subject-code').value=firstCls?.subject||'';
-    document.getElementById('prox-title').value='';
-    document.getElementById('prox-radius').value=75;
-    document.getElementById('prox-duration').value=10;
-    document.getElementById('prox-accuracy').value=50;
-    document.getElementById('prox-setup-error').style.display='none';
-    this._showStep('setup');
-    Modals.open('proximity');
-  },
-
-  close(){Modals.close('proximity');},
-
-  _showStep(step){
-    document.querySelectorAll('.prox-step').forEach(el=>el.classList.remove('active'));
-    document.getElementById('prox-step-'+step).classList.add('active');
-    document.getElementById('prox-footer-setup').style.display=step==='setup'?'flex':'none';
-    document.getElementById('prox-footer-active').style.display=step==='active'?'flex':'none';
-    document.getElementById('prox-footer-error').style.display=step==='error'?'flex':'none';
-  },
-
-  /* Stage 2 — Teacher Session Creation (GPS capture + backend session) */
-  async start(){
-    const classId=document.getElementById('prox-class-select').value;
-    const cls=State.classes.find(c=>c.id===classId);
-    if(!cls){toast('Select a class','err');return;}
-    const subjectCode=document.getElementById('prox-subject-code').value.trim()||cls.subject||'';
-    const radiusMeters=Number(document.getElementById('prox-radius').value)||75;
-    const durationMin=Number(document.getElementById('prox-duration').value)||10;
-    const maxAccuracy=Number(document.getElementById('prox-accuracy').value)||50;
-    const title=document.getElementById('prox-title').value.trim()||cls.name;
-
-    if(!navigator.geolocation){this._showError('Geolocation is not supported on this device/browser.');return;}
-    this._showStep('loading');
-    document.getElementById('prox-loading-msg').textContent='Requesting location permission…';
-
-    let pos;
-    try{ pos=await this._getLocation(); }
-    catch(err){ this._showError(err.message||'Could not capture your location. Please allow location access and try again.'); return; }
-
-    if(pos.coords.accuracy>maxAccuracy){
-      this._showError(`Location accuracy is too low (±${Math.round(pos.coords.accuracy)}m). Move to an open area and try again.`);
-      return;
-    }
-
-    document.getElementById('prox-loading-msg').textContent='Creating attendance session…';
-
-    const payload={
-      classId,className:cls.name,subjectCode,title,
-      institutionId:State.activeInstitutionId,branchId:State.activeBranchId,
-      teacherId:State.currentUser?.username,teacherName:State.currentUser?.name||State.currentUser?.username,
-      mode:ProximityConfig.attendanceMode,
-      lat:pos.coords.latitude,lng:pos.coords.longitude,accuracy:pos.coords.accuracy,
-      radiusMeters,maxAccuracyMeters:maxAccuracy,
-      requireQRCodeScan:ProximityConfig.requireQRCodeScan,
-      allowManualOverride:ProximityConfig.allowManualOverride,
-      sessionExpiryMinutes:durationMin,
-      createdAt:new Date().toISOString()
-    };
-
-    let result=null;
-    try{ result=await API.post('createProximitySession',payload); }catch(e){ result=null; }
-
-    const demo=!result||!result.success;
-    const sessionId=(result&&result.sessionId)||('PRX'+uid());
-    const expiresAt=(result&&result.expiresAt)||new Date(Date.now()+durationMin*60000).toISOString();
-    const joinUrl=(result&&result.joinUrl)||`${location.origin}${location.pathname.replace(/index\.html$/,'')}attendance/join?sessionId=${sessionId}&mode=qr_proximity`;
-
-    this._session={sessionId,joinUrl,expiresAt,title,className:cls.name,subjectCode,radiusMeters,demo,marked:0,accepted:0,rejected:0};
-    this._renderActive();
-    this._showStep('active');
-    this._startTimer();
-    this._startPolling();
-    toast(demo?'Session started in demo mode (no backend connection)':'Proximity session is now live — visible to students in AttendX-S within ~20s','',3500);
-  },
-
-  _getLocation(){
-    return new Promise((resolve,reject)=>{
-      navigator.geolocation.getCurrentPosition(
-        resolve,
-        err=>{
-          const msgs={1:'Location permission denied. Please enable location access for this site.',2:'Location unavailable. Check your device GPS/network.',3:'Location request timed out. Please try again.'};
-          reject(new Error(msgs[err.code]||'Failed to capture location.'));
-        },
-        {enableHighAccuracy:true,timeout:15000,maximumAge:0}
-      );
-    });
-  },
-
-  _showError(msg){
-    document.getElementById('prox-error-msg').textContent=msg;
-    this._showStep('error');
-  },
-
-  retry(){this._showStep('setup');},
-
-  _renderActive(){
-    const s=this._session;if(!s)return;
-    document.getElementById('prox-session-title').textContent=s.title;
-    document.getElementById('prox-session-meta').textContent=`${s.className}${s.subjectCode?' ('+s.subjectCode+')':''} · radius ${s.radiusMeters}m`;
-    document.getElementById('prox-join-link').textContent=s.joinUrl;
-    document.getElementById('prox-demo-note').textContent=s.demo?'Demo mode: no backend endpoint detected — students cannot mark attendance yet until the AttendX backend proximity APIs are connected.':'';
-    document.getElementById('prox-stat-marked').textContent=s.marked;
-    document.getElementById('prox-stat-accepted').textContent=s.accepted;
-    document.getElementById('prox-stat-rejected').textContent=s.rejected;
-    const canvas=document.getElementById('prox-qr-canvas');
-    if(window.QRCode&&canvas){
-      QRCode.toCanvas(canvas,s.joinUrl,{width:180,margin:1,color:{dark:'#0f1117',light:'#ffffff'}},err=>{if(err)console.error('QR render error:',err);});
-    }
-  },
-
-  _startTimer(){
-    clearInterval(this._timerInt);
-    const tick=()=>{
-      const s=this._session;if(!s)return;
-      const remain=new Date(s.expiresAt).getTime()-Date.now();
-      const badge=document.getElementById('prox-status-badge');
-      if(remain<=0){
-        document.getElementById('prox-timer').textContent='00:00';
-        badge.className='prox-status-badge expired';badge.innerHTML='<i class="ti ti-circle-filled" style="font-size:.5rem"></i> Expired';
-        clearInterval(this._timerInt);clearInterval(this._pollInt);
-        return;
-      }
-      const m=Math.floor(remain/60000),sec=Math.floor((remain%60000)/1000);
-      document.getElementById('prox-timer').textContent=`${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-    };
-    tick();this._timerInt=setInterval(tick,1000);
-  },
-
-  /* Stage 3/5 — live status polling (marked/accepted/rejected counts) */
-  _startPolling(){
-    clearInterval(this._pollInt);
-    if(this._session.demo)return; // no backend to poll against in demo mode
-    const poll=async()=>{
-      const s=this._session;if(!s)return;
-      const res=await API.get(`getProximitySessionStatus&sessionId=${s.sessionId}`);
-      if(res&&res.success){
-        s.marked=res.marked||0;s.accepted=res.accepted||0;s.rejected=res.rejected||0;
-        document.getElementById('prox-stat-marked').textContent=s.marked;
-        document.getElementById('prox-stat-accepted').textContent=s.accepted;
-        document.getElementById('prox-stat-rejected').textContent=s.rejected;
-      }
-    };
-    poll();this._pollInt=setInterval(poll,5000);
-  },
-
-  copyLink(){
-    const s=this._session;if(!s)return;
-    navigator.clipboard?.writeText(s.joinUrl).then(()=>toast('Join link copied','')).catch(()=>toast('Could not copy link','err'));
-  },
-
-  async endSession(){
-    const s=this._session;if(!s)return;
-    Confirm.show('End this attendance session? Students will no longer be able to mark attendance.',async()=>{
-      clearInterval(this._timerInt);clearInterval(this._pollInt);
-      if(!s.demo){try{await API.post('closeProximitySession',{sessionId:s.sessionId});}catch(e){}}
-      this._session=null;
-      Modals.close('proximity');
-      toast('Proximity session ended','');
-    },'End Session');
   }
 };
 
