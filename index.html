@@ -299,6 +299,25 @@ tbody tr:last-child td{border-bottom:none}
 tbody tr:hover td{background:rgba(255,255,255,.015)}
 .td-mono{font-family:var(--mono);font-size:.8rem}
 .td-muted{color:var(--text2);font-size:.8rem}
+
+/* ── SUBJECT REGISTER (Analytics → Reports.gs) ── */
+.report-header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:13px 14px;border-bottom:1px solid var(--border)}
+.report-title{font-size:.92rem;font-weight:700;margin:0;display:flex;align-items:center;gap:6px}
+.report-sub{font-size:.73rem;color:var(--text3);margin:2px 0 0}
+.report-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.report-actions select{padding:6px 10px;border-radius:var(--r8);border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:.8rem;font-weight:600;max-width:200px}
+.report-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px}
+table.register-grid{border-collapse:separate;border-spacing:0}
+table.register-grid th,table.register-grid td{text-align:center}
+table.register-grid th:first-child,table.register-grid td:first-child,
+table.register-grid th:nth-child(2),table.register-grid td:nth-child(2){text-align:left}
+.sticky-col{position:sticky;left:0;background:var(--surface);z-index:1}
+thead th.sticky-col{background:var(--surface2);z-index:2}
+.reg-mark{font-family:var(--mono);font-weight:700}
+.reg-P{color:var(--green)}
+.reg-A{color:var(--red)}
+.reg--{color:var(--text3)}
+
 .student-cards{display:flex;flex-direction:column;gap:7px}
 .student-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r12);padding:13px 14px;display:flex;align-items:center;gap:12px;transition:border-color .15s,background .15s;cursor:grab;position:relative}
 .student-card:active{cursor:grabbing}
@@ -665,6 +684,21 @@ tbody tr:hover td{background:rgba(255,255,255,.015)}
         <button class="btn btn-sm" onclick="Analytics.emailLowAttendance()"><i class="ti ti-mail"></i> Alert Low</button>
       </div>
       <div id="analytics-content"></div>
+      <div class="table-card" style="margin-top:16px">
+        <div class="report-header">
+          <div>
+            <h3 class="report-title"><i class="ti ti-clipboard-list"></i> Subject Register</h3>
+            <p class="report-sub" id="report-sub">Generated from Reports.gs — always in sync with Records</p>
+          </div>
+          <div class="report-actions">
+            <select id="report-subject-select" onchange="SubjectReport.selectSubject(this.value)"></select>
+            <button class="btn btn-sm" onclick="SubjectReport.refresh()" title="Re-sync from cloud"><i class="ti ti-refresh"></i></button>
+            <button class="btn btn-sm" onclick="SubjectReport.exportCSV()"><i class="ti ti-download"></i> Export</button>
+          </div>
+        </div>
+        <div class="report-stats" id="report-stats"></div>
+        <div class="table-scroll" id="report-table-wrap"></div>
+      </div>
     </section>
 
     <section class="view" id="view-alerts">
@@ -1000,6 +1034,9 @@ const avatarColor=n=>{const C=['#6366f1','#10b981','#f43f5e','#f59e0b','#3b82f6'
 const attStatus=v=>(typeof v==='object'&&v!==null)?(v.status||''):(v||'');
 const attRemark=v=>(typeof v==='object'&&v!==null)?(v.remark||''):'';
 const csvQ=v=>`"${String(v||'').replace(/"/g,'""')}"`;
+
+const escHtml=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
 /* Decimal percentage helper */
 const fmtPct=(present,total,decimals=1)=>total===0?'—':(present/total*100).toFixed(decimals)+'%';
 
@@ -1032,6 +1069,18 @@ const API = {
       return { success: false, error };
     }
   },
+  async get(action, params) {
+  if (!navigator.onLine) return null;
+  try {
+    let url = `${GAS_URL}?action=${action}`;
+    if (params) Object.keys(params).forEach(k => { url += `&${k}=${encodeURIComponent(params[k])}`; });
+    const response = await fetch(url);
+    return await response.json();
+  } catch (error) {
+    console.error(`Error fetching ${action}:`, error);
+    return { success: false, error };
+  }
+},
   async post(action, data) {
     if (!navigator.onLine) return null;
     try {
@@ -1610,7 +1659,7 @@ const App={
     this._buildClassSelector(id);
     if(id==='register')Register.render();
     if(id==='records')Records.render();
-    if(id==='analytics')Analytics.render();
+    if(id==='analytics'){Analytics.render();SubjectReport.render();}
     if(id==='alerts')AlertsView.render();
     if(id==='students')Students.render();
     if(id==='manage'){ManageView.render();document.getElementById('class-selector-bar').style.display='none';}
@@ -1637,7 +1686,7 @@ const App={
     this._buildClassSelector(this._current);
     if(this._current==='register')Register.render();
     if(this._current==='records')Records.render();
-    if(this._current==='analytics')Analytics.render();
+    if(this._current==='analytics'){Analytics.render();SubjectReport.render();}
     if(this._current==='alerts')AlertsView.render();
     if(this._current==='students')Students.render();
   },
@@ -2674,6 +2723,119 @@ const Analytics={
       <div style="font-size:.76rem;color:var(--text3);margin-top:9px">Preview:</div>
       <div class="alert-msg-preview">${msgText}</div>`;
     Modals.open('alert');
+  }
+};
+
+const SubjectReport={
+  data:null, currentSubject:null, _lastClassId:null,
+
+  render(){
+    const wrap=document.getElementById('report-table-wrap');
+    const stats=document.getElementById('report-stats');
+    const sel=document.getElementById('report-subject-select');
+    if(!wrap)return;
+
+    if(!State.currentClassId){
+      wrap.innerHTML=`<div class="empty-state"><i class="ti ti-clipboard-list"></i><h3>No class selected</h3><p>Pick a class to view its subject-wise register</p></div>`;
+      stats.innerHTML='';sel.innerHTML='';return;
+    }
+    if(this._lastClassId!==State.currentClassId){this.data=null;this.currentSubject=null;this._lastClassId=State.currentClassId;}
+    if(!this.data){this.fetch();return;}
+    this._renderBody();
+  },
+
+  async fetch(){
+    const wrap=document.getElementById('report-table-wrap');
+    const stats=document.getElementById('report-stats');
+    const sel=document.getElementById('report-subject-select');
+    wrap.innerHTML=`<div class="empty-state"><i class="ti ti-loader-2"></i><h3>Loading register…</h3><p>Pulling the latest data from Reports.gs</p></div>`;
+    stats.innerHTML='';sel.innerHTML='';
+
+    if(!navigator.onLine){
+      wrap.innerHTML=`<div class="empty-state"><i class="ti ti-wifi-off"></i><h3>Offline</h3><p>Connect to the internet to sync the subject register</p></div>`;
+      return;
+    }
+    const res=await API.get('getSubjectReport',{classId:State.currentClassId});
+    if(!res||!res.success){
+      wrap.innerHTML=`<div class="empty-state"><i class="ti ti-alert-triangle"></i><h3>Couldn't load report</h3><p>${res&&res.message?res.message:'Try the refresh button.'}</p></div>`;
+      return;
+    }
+    this.data=res;
+    if(!res.subjects.length){
+      wrap.innerHTML=`<div class="empty-state"><i class="ti ti-clipboard-list"></i><h3>No sessions yet</h3><p>Mark attendance to generate a subject register</p></div>`;
+      return;
+    }
+    if(!this.currentSubject||!res.subjects.find(s=>s.subject===this.currentSubject)){
+      this.currentSubject=res.subjects[0].subject;
+    }
+    this._buildSelect();
+    this._renderBody();
+  },
+
+  refresh(){this.data=null;this.render();toast('Re-syncing subject register…');},
+
+  selectSubject(subj){this.currentSubject=subj;this._renderBody();},
+
+  _current(){return this.data&&this.data.subjects.find(s=>s.subject===this.currentSubject);},
+
+  _buildSelect(){
+    const sel=document.getElementById('report-subject-select');
+    sel.innerHTML=this.data.subjects.map(s=>
+      `<option value="${escHtml(s.subject)}" ${s.subject===this.currentSubject?'selected':''}>${escHtml(s.subject)} (${s.sessionCount})</option>`
+    ).join('');
+  },
+
+  _renderBody(){
+    const wrap=document.getElementById('report-table-wrap');
+    const stats=document.getElementById('report-stats');
+    const sub=this._current();
+    if(!sub){wrap.innerHTML='';stats.innerHTML='';return;}
+
+    const low=sub.students.filter(s=>s.pct<Analytics.threshold).length;
+    stats.innerHTML=`
+      <div class="stat-card s-total"><div class="stat-label">Sessions</div><div class="stat-val c-indigo">${sub.sessionCount}</div></div>
+      <div class="stat-card s-pct"><div class="stat-label">Class Average</div><div class="stat-val c-amber">${sub.classAvg.toFixed(1)}%</div></div>
+      <div class="stat-card s-absent"><div class="stat-label">Below Threshold</div><div class="stat-val c-absent">${low}</div></div>`;
+
+    if(!sub.sessions.length){
+      wrap.innerHTML=`<div class="empty-state"><i class="ti ti-clipboard-list"></i><h3>No sessions for this subject yet</h3></div>`;
+      return;
+    }
+
+    wrap.innerHTML=`<table class="register-grid">
+      <thead><tr>
+        <th class="sticky-col">Roll</th>
+        <th class="sticky-col" style="left:64px">Student</th>
+        ${sub.sessions.map(s=>`<th title="${escHtml(s.topic||'')}">${s.label}</th>`).join('')}
+        <th>P/T</th><th>%</th>
+      </tr></thead>
+      <tbody>${sub.students.map(st=>{
+        const barColor=st.pct>=75?'var(--green)':st.pct>=50?'var(--amber)':'var(--red)';
+        const lowRow=st.pct<Analytics.threshold?'style="background:rgba(244,63,94,.04)"':'';
+        return `<tr ${lowRow}>
+          <td class="td-mono sticky-col">${st.roll||'—'}</td>
+          <td class="sticky-col" style="left:64px;font-weight:600;white-space:nowrap">${escHtml(st.name)}</td>
+          ${st.marks.map(m=>`<td class="reg-mark reg-${m}">${m}</td>`).join('')}
+          <td class="td-mono">${st.present}/${st.total}</td>
+          <td style="color:${barColor};font-weight:700">${st.pct.toFixed(1)}%</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+  },
+
+  exportCSV(){
+    const sub=this._current();
+    if(!sub||!sub.sessions.length)return toast('Nothing to export yet','err');
+    let rows=[
+      ['Institution',this.data.className||'','Subject',csvQ(sub.subject)].join(','),
+      ['Exported',new Date().toLocaleString()].join(','),'',
+      ['Roll No','Student Name','Student ID',...sub.sessions.map(s=>csvQ(s.label)),'Present','Total','Attendance %'].join(',')
+    ];
+    sub.students.forEach(st=>{
+      rows.push([csvQ(st.roll),csvQ(st.name),csvQ(st.sid),...st.marks,st.present,st.total,st.pct.toFixed(1)+'%'].join(','));
+    });
+    ExportEngine._dl(rows.join('\n'),`register-${sub.subject}-${new Date().toISOString().split('T')[0]}.csv`);
+    toast('Register exported');
   }
 };
 
