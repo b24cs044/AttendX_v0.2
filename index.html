@@ -705,6 +705,7 @@ thead th.sticky-col{background:var(--surface2);z-index:2}
           </div>
           <div class="report-actions">
             <select id="report-subject-select" onchange="SubjectReport.selectSubject(this.value)"></select>
+            <button class="btn btn-sm" id="report-view-toggle" onclick="SubjectReport.toggleView()" title="Toggle graph view"><i class="ti ti-chart-histogram"></i> Graphs</button>
             <button class="btn btn-sm" onclick="SubjectReport.refresh()" title="Re-sync from cloud"><i class="ti ti-refresh"></i></button>
             <button class="btn btn-sm" onclick="SubjectReport.exportCSV()"><i class="ti ti-download"></i> Export</button>
           </div>
@@ -2963,7 +2964,7 @@ const SubjectReport={
       ${svg}
     </div>`;
   },
-  
+
   exportCSV(){
     const sub=this._current();
     if(!sub||!sub.sessions.length)return toast('Nothing to export yet','err');
