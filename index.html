@@ -318,6 +318,19 @@ thead th.sticky-col{background:var(--surface2);z-index:2}
 .reg-A{color:var(--red)}
 .reg--{color:var(--text3)}
 
+#report-view-toggle.active{background:var(--indigo-light);color:#fff;border-color:var(--indigo-light)}
+.chart-block{padding:16px 14px;border-bottom:1px solid var(--border)}
+.chart-block:last-child{border-bottom:none}
+.chart-block-title{font-size:.8rem;font-weight:700;margin:0 0 2px;display:flex;align-items:center;gap:6px}
+.chart-block-sub{font-size:.71rem;color:var(--text3);margin:0 0 10px}
+.chart-svg{width:100%;height:auto;display:block;overflow:visible}
+.chart-svg-fixed{display:block;overflow:visible}
+.chart-bar-label{font-size:9px;fill:var(--text3);font-family:var(--mono)}
+.chart-name-label{font-size:10px;fill:var(--text2)}
+.chart-val-label{font-size:9.5px;font-weight:700;font-family:var(--mono)}
+.chart-axis-label{font-size:9px;fill:var(--text3)}
+.chart-empty{font-size:.78rem;color:var(--text3);text-align:center;padding:20px 0}
+
 .student-cards{display:flex;flex-direction:column;gap:7px}
 .student-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r12);padding:13px 14px;display:flex;align-items:center;gap:12px;transition:border-color .15s,background .15s;cursor:grab;position:relative}
 .student-card:active{cursor:grabbing}
@@ -698,6 +711,7 @@ thead th.sticky-col{background:var(--surface2);z-index:2}
         </div>
         <div class="report-stats" id="report-stats"></div>
         <div class="table-scroll" id="report-table-wrap"></div>
+        <div id="report-charts-wrap" style="display:none"></div>
       </div>
     </section>
 
@@ -2727,7 +2741,18 @@ const Analytics={
 };
 
 const SubjectReport={
-  data:null, currentSubject:null, _lastClassId:null,
+  data:null, currentSubject:null, _lastClassId:null, showGraphs:false,
+
+  toggleView(){
+    this.showGraphs=!this.showGraphs;
+    const btn=document.getElementById('report-view-toggle');
+    const tableWrap=document.getElementById('report-table-wrap');
+    const chartsWrap=document.getElementById('report-charts-wrap');
+    if(btn)btn.classList.toggle('active',this.showGraphs);
+    if(tableWrap)tableWrap.style.display=this.showGraphs?'none':'';
+    if(chartsWrap)chartsWrap.style.display=this.showGraphs?'':'none';
+    this._renderBody();
+  },
 
   render(){
     const wrap=document.getElementById('report-table-wrap');
@@ -2798,10 +2823,18 @@ const SubjectReport={
       <div class="stat-card s-absent"><div class="stat-label">Below Threshold</div><div class="stat-val c-absent">${low}</div></div>`;
 
     if(!sub.sessions.length){
-      wrap.innerHTML=`<div class="empty-state"><i class="ti ti-clipboard-list"></i><h3>No sessions for this subject yet</h3></div>`;
+      const emptyMsg=`<div class="empty-state"><i class="ti ti-clipboard-list"></i><h3>No sessions for this subject yet</h3></div>`;
+      wrap.innerHTML=emptyMsg;
+      document.getElementById('report-charts-wrap').innerHTML=emptyMsg;
       return;
     }
 
+    if(this.showGraphs){ this._renderCharts(sub); }
+    else { this._renderTable(sub); }
+  },
+
+  _renderTable(sub){
+    const wrap=document.getElementById('report-table-wrap');
     wrap.innerHTML=`<table class="register-grid">
       <thead><tr>
         <th class="sticky-col">Roll</th>
@@ -2823,6 +2856,114 @@ const SubjectReport={
     </table>`;
   },
 
+  _renderCharts(sub){
+    const chartsWrap=document.getElementById('report-charts-wrap');
+    chartsWrap.innerHTML=
+      this._histogramBlock(sub) +
+      this._trendBlock(sub) +
+      this._studentBarsBlock(sub);
+  },
+
+  _histogramBlock(sub){
+    const buckets=[
+      {label:'0–25%',  min:0,  max:25,  color:'var(--red)'},
+      {label:'26–50%', min:26, max:50,  color:'#f97316'},
+      {label:'51–75%', min:51, max:75,  color:'var(--amber)'},
+      {label:'76–100%',min:76, max:100, color:'var(--green)'},
+    ];
+    const counts=buckets.map(b=>sub.students.filter(s=>s.pct>=b.min&&s.pct<=b.max).length);
+    const maxCount=Math.max(1,...counts);
+    const W=560,H=180,padL=20,padR=20,padT=24,padB=28;
+    const chartW=W-padL-padR, chartH=H-padT-padB;
+    const barGap=24;
+    const barW=(chartW-barGap*(buckets.length-1))/buckets.length;
+
+    let bars='';
+    buckets.forEach((b,i)=>{
+      const h=(counts[i]/maxCount)*chartH;
+      const x=padL+i*(barW+barGap);
+      const y=padT+chartH-h;
+      bars+=`<rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="4" fill="${b.color}"/>`;
+      bars+=`<text x="${x+barW/2}" y="${y-6}" text-anchor="middle" class="chart-val-label" fill="${b.color}">${counts[i]}</text>`;
+      bars+=`<text x="${x+barW/2}" y="${H-8}" text-anchor="middle" class="chart-bar-label">${b.label}</text>`;
+    });
+
+    const svg=`<svg class="chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:${H}px" xmlns="http://www.w3.org/2000/svg">
+      <line x1="${padL}" y1="${padT+chartH}" x2="${W-padR}" y2="${padT+chartH}" stroke="var(--border2)" stroke-width="1"/>
+      ${bars}
+    </svg>`;
+
+    return `<div class="chart-block">
+      <h4 class="chart-block-title"><i class="ti ti-chart-histogram"></i> Attendance % Distribution</h4>
+      <p class="chart-block-sub">How many students fall into each attendance range for ${escHtml(sub.subject)}</p>
+      ${svg}
+    </div>`;
+  },
+
+  _trendBlock(sub){
+    const n=sub.sessions.length;
+    const total=sub.students.length||1;
+    const W=Math.max(560,n*70), H=190, padL=34,padR=16,padT=24,padB=34;
+    const chartW=W-padL-padR, chartH=H-padT-padB;
+    const step=chartW/n;
+    const barW=Math.min(34,step*0.55);
+
+    let bars='';
+    sub.sessions.forEach((s,i)=>{
+      let present=0,absent=0;
+      sub.students.forEach(st=>{
+        const m=st.marks[i];
+        if(m==='P')present++; else if(m==='A')absent++;
+      });
+      const x=padL+i*step+(step-barW)/2;
+      const pH=(present/total)*chartH;
+      const aH=(absent/total)*chartH;
+      const absentTop=padT+chartH-pH-aH;
+      bars+=`<rect x="${x}" y="${padT+chartH-pH}" width="${barW}" height="${pH}" fill="var(--green)"/>`;
+      bars+=`<rect x="${x}" y="${absentTop}" width="${barW}" height="${aH}" fill="var(--red)"/>`;
+      bars+=`<text x="${x+barW/2}" y="${absentTop-6}" text-anchor="middle" class="chart-val-label" fill="var(--text2)">${present}/${total}</text>`;
+      bars+=`<text x="${x+barW/2}" y="${H-10}" text-anchor="middle" class="chart-bar-label">${escHtml(s.label.slice(0,5))}</text>`;
+    });
+
+    const svg=`<svg class="chart-svg-fixed" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
+      <line x1="${padL}" y1="${padT+chartH}" x2="${W-padR}" y2="${padT+chartH}" stroke="var(--border2)" stroke-width="1"/>
+      ${bars}
+    </svg>`;
+
+    return `<div class="chart-block">
+      <h4 class="chart-block-title"><i class="ti ti-trending-up"></i> Present vs Absent per Session</h4>
+      <p class="chart-block-sub">Stacked bars (green = present, red = absent) across every session for ${escHtml(sub.subject)}</p>
+      <div style="overflow-x:auto">${svg}</div>
+    </div>`;
+  },
+
+  _studentBarsBlock(sub){
+    const rowH=26,padT=10,padB=10,padL=94,padR=46,W=600;
+    const chartW=W-padL-padR;
+    const students=[...sub.students].sort((a,b)=>a.pct-b.pct);
+    const H=students.length*rowH+padT+padB;
+
+    let bars='';
+    students.forEach((st,i)=>{
+      const y=padT+i*rowH;
+      const barH=rowH*0.55;
+      const w=Math.max(2,(st.pct/100)*chartW);
+      const color=st.pct>=75?'var(--green)':st.pct>=50?'var(--amber)':'var(--red)';
+      const shortName=st.name.length>13?st.name.slice(0,12)+'…':st.name;
+      bars+=`<text x="${padL-8}" y="${y+barH/2+3}" text-anchor="end" class="chart-name-label">${escHtml(shortName)}</text>`;
+      bars+=`<rect x="${padL}" y="${y}" width="${w}" height="${barH}" rx="3" fill="${color}"/>`;
+      bars+=`<text x="${padL+w+6}" y="${y+barH/2+3}" class="chart-val-label" fill="${color}">${st.pct.toFixed(0)}%</text>`;
+    });
+
+    const svg=`<svg class="chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:${H}px" xmlns="http://www.w3.org/2000/svg">${bars}</svg>`;
+
+    return `<div class="chart-block">
+      <h4 class="chart-block-title"><i class="ti ti-align-left"></i> Per-Student Attendance</h4>
+      <p class="chart-block-sub">Sorted lowest to highest for ${escHtml(sub.subject)} — spot at-risk students at a glance</p>
+      ${svg}
+    </div>`;
+  },
+  
   exportCSV(){
     const sub=this._current();
     if(!sub||!sub.sessions.length)return toast('Nothing to export yet','err');
