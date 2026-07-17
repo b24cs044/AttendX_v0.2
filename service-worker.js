@@ -1,4 +1,4 @@
-const CACHE_NAME = 'attendx-pwa-v1.3.1';
+const CACHE_NAME = 'attendx-pwa-v1.3.2';
 
 // Static assets critical for offline load
 const PRECACHE_ASSETS = [
