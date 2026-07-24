@@ -134,6 +134,32 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);height:100%;
 .home-logout{display:flex;align-items:center;justify-content:center;margin-top:6px;gap:12px;}
 .home-logout button{background:transparent;border:1px solid var(--border2);border-radius:var(--r8);color:var(--text2);font-family:var(--sans);font-size:.78rem;font-weight:500;cursor:pointer;padding:7px 14px;display:flex;align-items:center;gap:5px;transition:all .15s}
 .home-logout button:hover{color:var(--red);border-color:rgba(244,63,94,.4);background:var(--red-bg)}
+
+/* Notice Board home button */
+.notice-board-btn{width:100%;display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r12);padding:14px 16px;cursor:pointer;margin-top:14px;transition:all .15s;text-align:left;font-family:var(--sans)}
+.notice-board-btn:hover{border-color:var(--indigo);box-shadow:0 6px 20px rgba(99,102,241,.15)}
+.notice-board-btn .nb-icon{width:42px;height:42px;border-radius:12px;background:var(--indigo-bg);color:var(--indigo-light);display:grid;place-items:center;font-size:1.25rem;flex-shrink:0;position:relative}
+.notice-board-btn .nb-text{flex:1;min-width:0}
+.notice-board-btn .nb-title{font-size:.9rem;font-weight:700;color:var(--text)}
+.notice-board-btn .nb-sub{font-size:.72rem;color:var(--text3)}
+.nb-badge{position:absolute;top:-4px;right:-4px;background:var(--red);color:#fff;font-size:.62rem;font-weight:700;min-width:16px;height:16px;border-radius:9px;display:grid;place-items:center;padding:0 4px}
+
+/* Notice board list & modal */
+.notice-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--r12);padding:16px;margin-bottom:12px;position:relative}
+.notice-item.unread{border-left:4px solid var(--indigo)}
+.notice-item-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px}
+.notice-item-title{font-size:.98rem;font-weight:700;color:var(--text)}
+.notice-item-date{font-size:.68rem;color:var(--text3);white-space:nowrap}
+.notice-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.notice-tag{font-size:.66rem;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
+.notice-item-body{font-size:.82rem;color:var(--text2);white-space:pre-wrap;line-height:1.55;margin-bottom:8px}
+.notice-item-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:.72rem;color:var(--text3)}
+.notice-attach-link{display:inline-flex;align-items:center;gap:5px;color:var(--indigo-light);text-decoration:none;font-size:.78rem;font-weight:600}
+.notice-attach-link:hover{text-decoration:underline}
+.notice-item-actions{display:flex;gap:6px}
+.notice-duration-row{display:flex;gap:10px;align-items:center}
+.notice-duration-row .form-group{flex:1}
+.notice-single-toggle{display:flex;align-items:center;gap:7px;font-size:.78rem;color:var(--text2);margin-bottom:11px;cursor:pointer}
 /* Home footer */
 .home-footer{width:100%;text-align:center;margin-top:22px;padding-top:16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:4px}
 .home-footer span{font-size:.68rem;color:var(--text3);line-height:1.5}
@@ -597,6 +623,15 @@ thead th.sticky-col{background:var(--surface2);z-index:2}
       <button id="pwa-install-btn" class="pwa-install-btn" style="display:none;" onclick="installPWA()"><i class="ti ti-download"></i> Install App</button>
     </div>
 
+    <button class="notice-board-btn" onclick="App.openView('notices')">
+      <div class="nb-icon"><i class="ti ti-speakerphone"></i><span class="nb-badge" id="nb-unread-badge" style="display:none">0</span></div>
+      <div class="nb-text">
+        <div class="nb-title">Notice Board</div>
+        <div class="nb-sub">View &amp; post notices, circulars and announcements</div>
+      </div>
+      <i class="ti ti-chevron-right" style="color:var(--text3)"></i>
+    </button>
+
     <footer class="home-footer">
       <span>© <span id="footer-year"></span> TechnoMedia Software Solutions Private Limited</span>
       <span>All rights reserved. Unauthorised use prohibited.</span>
@@ -765,6 +800,20 @@ thead th.sticky-col{background:var(--surface2);z-index:2}
         <button class="tab-btn" data-tab="master" onclick="ManageView.openTab('master')"><i class="ti ti-database"></i> Master Data</button>
       </div>
       <div id="manage-content"></div>
+    </section>
+
+    <section class="view" id="view-notices">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Notice Board</h1>
+          <p class="page-sub">Announcements &amp; circulars — visible in every app</p>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-sm" onclick="Notices.refresh()"><i class="ti ti-refresh"></i></button>
+          <button class="btn btn-sm btn-primary" onclick="Notices.openPostModal()"><i class="ti ti-plus"></i> Post Notice</button>
+        </div>
+      </div>
+      <div id="notices-content"></div>
     </section>
 
   </div></div>
@@ -1001,6 +1050,66 @@ Shyam,B2-07,TMSS2607,+91 7893281282,shyam@tmss.edu,+91 7893281282,@shyam_parent,
   </div>
 </div>
 
+<div class="modal-overlay" id="overlay-notice">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-notice-title">Post Notice</span>
+      <button class="icon-btn" onclick="Modals.close('notice')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="ntc-id"/>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">Department</label>
+          <input type="text" id="ntc-department" class="form-input" list="ntc-dept-list" placeholder="e.g. Computer Science (or All)"/>
+          <datalist id="ntc-dept-list"></datalist>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Class</label>
+          <input type="text" id="ntc-class" class="form-input" list="ntc-class-list" placeholder="e.g. 3rd Year (or All)"/>
+          <datalist id="ntc-class-list"></datalist>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Section</label>
+          <input type="text" id="ntc-section" class="form-input" list="ntc-section-list" placeholder="e.g. A (or All)"/>
+          <datalist id="ntc-section-list"></datalist>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Topic / Subject *</label>
+          <input type="text" id="ntc-topic" class="form-input" placeholder="e.g. Mid-Sem Exam Schedule"/>
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:11px">
+        <label class="form-label">Description *</label>
+        <textarea id="ntc-description" class="form-input" rows="5" placeholder="Full notice text…"></textarea>
+      </div>
+      <div class="section-divider">Duration</div>
+      <label class="notice-single-toggle">
+        <input type="checkbox" id="ntc-single-day" checked onchange="Notices.toggleSingleDay()"/> Single day notice
+      </label>
+      <div class="notice-duration-row">
+        <div class="form-group">
+          <label class="form-label" id="ntc-from-label">Date</label>
+          <input type="date" id="ntc-from" class="form-input"/>
+        </div>
+        <div class="form-group" id="ntc-to-wrap" style="display:none">
+          <label class="form-label">To</label>
+          <input type="date" id="ntc-to" class="form-input"/>
+        </div>
+      </div>
+      <div class="section-divider">Attachment / Circular</div>
+      <div class="form-group">
+        <input type="file" id="ntc-file" class="form-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"/>
+        <div id="ntc-existing-attachment" style="font-size:.76rem;color:var(--text2);margin-top:6px"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="Modals.close('notice')">Cancel</button>
+      <button class="btn btn-primary" id="ntc-save-btn" onclick="Notices.save()"><i class="ti ti-send"></i> Post Notice</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="overlay-about">
   <div class="modal modal-sm">
     <div class="modal-header">
@@ -1064,6 +1173,7 @@ const State={
   classes:[], students:[], records:[],
   
   categories: [], subCategories: [], subSubCategories: [],
+  notices: [],
   
   subjects:['General','Mathematics','Science','English','History','Computer Science','Art & Design','Physical Education'],
   threshold:75, currentClassId:null, attendance:{}, csvPreviewData:[],
@@ -1125,6 +1235,7 @@ function saveAll(){
   DB.set('categories', State.categories);
   DB.set('subCategories', State.subCategories);
   DB.set('subSubCategories', State.subSubCategories);
+  DB.set('notices', State.notices);
 }
 
 /* ── Toast ── */
@@ -1511,6 +1622,7 @@ _loadData(){
     State.categories = DB.get('categories', []);
     State.subCategories = DB.get('subCategories', []);
     State.subSubCategories = DB.get('subSubCategories', []);
+    State.notices = DB.get('notices', []);
     // ----------------------------
     State.subjects=DB.get('subjects',['General','Mathematics','Science','English','Computer Science','Physics','Chemistry','Art & Design']);
     State.threshold=DB.get('threshold',75);
@@ -1650,7 +1762,7 @@ function updateHomeContext(){
 }
 
 /* ══ APP ══ */
-const viewNames={register:'Mark Attendance',records:'Records',analytics:'Analytics',alerts:'Alerts',students:'Students',manage:'Manage'};
+const viewNames={register:'Mark Attendance',records:'Records',analytics:'Analytics',alerts:'Alerts',students:'Students',manage:'Manage',notices:'Notice Board'};
 const App={
   _current:null,
   goHome(fromPop){
@@ -1677,7 +1789,8 @@ const App={
     if(id==='analytics'){Analytics.render();SubjectReport.render();}
     if(id==='alerts')AlertsView.render();
     if(id==='students')Students.render();
-    if(id==='manage'){ManageView.render();document.getElementById('class-selector-bar').style.display='none';}
+    if(id==='notices')Notices.render();
+    if(id==='manage'||id==='notices'){document.getElementById('class-selector-bar').style.display='none';if(id==='manage')ManageView.render();}
     else{document.getElementById('class-selector-bar').style.display='flex';}
     if(!fromPop) history.pushState({axView:id},'',location.pathname);
     
@@ -3032,6 +3145,184 @@ const AlertsView={
     document.getElementById('alert-modal-title').textContent='Monthly Report';
     document.getElementById('alert-modal-body').innerHTML=`<p style="font-size:.83rem;color:var(--text2);margin-bottom:11px">Sending to <strong>${students.filter(s=>s.pemail||s.ptelegram).length}</strong> parents with contact info.</p><div class="alert-msg-preview">${msg}</div>`;
     Modals.open('alert');
+  }
+};
+
+const Notices={
+  loading:false,
+  _editingId:null,
+
+  async render(){
+    const el=document.getElementById('notices-content');if(!el)return;
+    if(!State.notices||!State.notices.length){el.innerHTML=`<div class="table-card"><div class="empty-state"><i class="ti ti-speakerphone"></i><h3>No notices yet</h3><p style="font-size:.8rem;color:var(--text3);margin-top:4px">Tap "Post Notice" to publish the first one.</p></div></div>`;}
+    else{this._draw(el);}
+    this.updateBadge();
+    await this.refresh(true);
+  },
+
+  async refresh(silent){
+    if(this.loading)return;
+    this.loading=true;
+    if(!silent){const el=document.getElementById('notices-content');if(el)el.insertAdjacentHTML('afterbegin','<p style="font-size:.75rem;color:var(--text3);margin-bottom:8px">Refreshing…</p>');}
+    const res=await API.get('getNotices');
+    this.loading=false;
+    if(res && res.success){
+      State.notices=(res.data||[]).sort((a,b)=>new Date(b.postedAt)-new Date(a.postedAt));
+      DB.set('notices',State.notices);
+      DB.set('noticesLastSeen',DB.get('noticesLastSeen',null));
+      const el=document.getElementById('notices-content');
+      if(el && App._current==='notices')this._draw(el);
+      this.updateBadge();
+    }
+  },
+
+  _draw(el){
+    if(!State.notices.length){el.innerHTML=`<div class="table-card"><div class="empty-state"><i class="ti ti-speakerphone"></i><h3>No notices yet</h3></div></div>`;return;}
+    const lastSeen=DB.get('noticesLastSeen',null);
+    const isAdmin=State.currentUser?.role==='admin';
+    el.innerHTML=State.notices.map(n=>{
+      const unread=!lastSeen||new Date(n.postedAt)>new Date(lastSeen);
+      const tags=[n.department,n.class,n.section].filter(t=>t && t.trim() && t.trim().toLowerCase()!=='all');
+      const durationTxt=n.durationTo && n.durationTo!==n.durationFrom ? `${fmtDate(n.durationFrom)} – ${fmtDate(n.durationTo)}` : (n.durationFrom?fmtDate(n.durationFrom):'');
+      return `<div class="notice-item ${unread?'unread':''}">
+        <div class="notice-item-head">
+          <span class="notice-item-title">${escHtml(n.topic)}</span>
+          <span class="notice-item-date">${fmtDateTime(n.postedAt)}</span>
+        </div>
+        ${tags.length?`<div class="notice-tags">${tags.map(t=>`<span class="notice-tag">${escHtml(t)}</span>`).join('')}</div>`:'<div class="notice-tags"><span class="notice-tag">All</span></div>'}
+        <div class="notice-item-body">${escHtml(n.description)}</div>
+        <div class="notice-item-foot">
+          <div>${durationTxt?`<i class="ti ti-calendar-event"></i> ${durationTxt}`:''} ${n.postedBy?` · by ${escHtml(n.postedBy)}`:''}</div>
+          <div class="notice-item-actions">
+            ${n.attachmentUrl?`<a class="notice-attach-link" href="${n.attachmentUrl}" target="_blank" rel="noopener"><i class="ti ti-paperclip"></i> ${escHtml(n.attachmentName||'Attachment')}</a>`:''}
+            ${isAdmin?`<button class="btn btn-xs" onclick="Notices.openPostModal('${n.noticeId}')"><i class="ti ti-pencil"></i></button>
+            <button class="btn btn-xs btn-danger" onclick="Notices.remove('${n.noticeId}')"><i class="ti ti-trash"></i></button>`:''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    DB.set('noticesLastSeen',new Date().toISOString());
+    this.updateBadge();
+  },
+
+  updateBadge(){
+    const badge=document.getElementById('nb-unread-badge');if(!badge)return;
+    const lastSeen=DB.get('noticesLastSeen',null);
+    const count=(State.notices||[]).filter(n=>!lastSeen||new Date(n.postedAt)>new Date(lastSeen)).length;
+    if(count>0){badge.style.display='grid';badge.textContent=count>9?'9+':count;}else{badge.style.display='none';}
+  },
+
+  _fillDatalist(id,values){
+    const dl=document.getElementById(id);if(!dl)return;
+    const uniq=[...new Set(values.filter(Boolean))];
+    dl.innerHTML=uniq.map(v=>`<option value="${escHtml(v)}"></option>`).join('');
+  },
+
+  openPostModal(noticeId){
+    this._editingId=noticeId||null;
+    document.getElementById('modal-notice-title').textContent=noticeId?'Edit Notice':'Post Notice';
+    document.getElementById('ntc-save-btn').innerHTML=noticeId?'<i class="ti ti-check"></i> Save Changes':'<i class="ti ti-send"></i> Post Notice';
+    document.getElementById('ntc-id').value=noticeId||'';
+    document.getElementById('ntc-file').value='';
+
+    this._fillDatalist('ntc-dept-list',State.students.map(s=>s.department));
+    this._fillDatalist('ntc-class-list',State.students.map(s=>s.class));
+    this._fillDatalist('ntc-section-list',State.students.map(s=>s.section));
+
+    if(noticeId){
+      const n=(State.notices||[]).find(x=>x.noticeId===noticeId);
+      if(!n){toast('Notice not found locally — refresh and retry','err');return;}
+      document.getElementById('ntc-department').value=n.department||'';
+      document.getElementById('ntc-class').value=n.class||'';
+      document.getElementById('ntc-section').value=n.section||'';
+      document.getElementById('ntc-topic').value=n.topic||'';
+      document.getElementById('ntc-description').value=n.description||'';
+      const single=!n.durationTo || n.durationTo===n.durationFrom;
+      document.getElementById('ntc-single-day').checked=single;
+      document.getElementById('ntc-from').value=n.durationFrom||'';
+      document.getElementById('ntc-to').value=n.durationTo||n.durationFrom||'';
+      document.getElementById('ntc-existing-attachment').textContent=n.attachmentUrl?`Current attachment: ${n.attachmentName||'file'} (uploading a new file will replace it)`:'';
+    } else {
+      document.getElementById('ntc-department').value='';
+      document.getElementById('ntc-class').value='';
+      document.getElementById('ntc-section').value='';
+      document.getElementById('ntc-topic').value='';
+      document.getElementById('ntc-description').value='';
+      document.getElementById('ntc-single-day').checked=true;
+      document.getElementById('ntc-from').valueAsDate=new Date();
+      document.getElementById('ntc-to').value='';
+      document.getElementById('ntc-existing-attachment').textContent='';
+    }
+    this.toggleSingleDay();
+    Modals.open('notice');
+  },
+
+  toggleSingleDay(){
+    const single=document.getElementById('ntc-single-day').checked;
+    document.getElementById('ntc-from-label').textContent=single?'Date':'From';
+    document.getElementById('ntc-to-wrap').style.display=single?'none':'block';
+  },
+
+  async save(){
+    const topic=document.getElementById('ntc-topic').value.trim();
+    const description=document.getElementById('ntc-description').value.trim();
+    if(!topic)return toast('Topic / Subject is required','err');
+    if(!description)return toast('Description is required','err');
+
+    const single=document.getElementById('ntc-single-day').checked;
+    const from=document.getElementById('ntc-from').value;
+    const to=single?from:(document.getElementById('ntc-to').value||from);
+
+    const btn=document.getElementById('ntc-save-btn');btn.disabled=true;
+    const originalHtml=btn.innerHTML;btn.innerHTML='<i class="ti ti-loader-2"></i> Saving…';
+
+    try{
+      const fileInput=document.getElementById('ntc-file');
+      let attachment=null;
+      if(fileInput.files && fileInput.files[0]){
+        attachment=await this._readFileAsBase64(fileInput.files[0]);
+      }
+
+      const payload={
+        noticeId:this._editingId||undefined,
+        department:document.getElementById('ntc-department').value.trim()||'All',
+        class:document.getElementById('ntc-class').value.trim()||'All',
+        section:document.getElementById('ntc-section').value.trim()||'All',
+        topic,description,
+        durationFrom:from,durationTo:to,
+        attachment,
+        postedBy:State.currentUser?.username||State.currentUser?.name||''
+      };
+
+      const action=this._editingId?'updateNotice':'postNotice';
+      const res=await API.post(action,payload);
+      if(res && res.success){
+        toast(this._editingId?'Notice updated':'Notice posted');
+        Modals.close('notice');
+        await this.refresh();
+      } else {
+        toast('Failed to save notice'+(res&&res.error?(': '+res.error):''),'err');
+      }
+    } finally {
+      btn.disabled=false;btn.innerHTML=originalHtml;
+    }
+  },
+
+  async remove(noticeId){
+    Confirm.show('Delete this notice? This cannot be undone.',async()=>{
+      const res=await API.post('deleteNotice',{noticeId});
+      if(res && res.success){toast('Notice deleted');await this.refresh();}
+      else toast('Failed to delete notice','err');
+    },'Delete');
+  },
+
+  _readFileAsBase64(file){
+    return new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onload=()=>resolve({filename:file.name,mimeType:file.type||'application/octet-stream',base64:reader.result.split(',')[1]});
+      reader.onerror=reject;
+      reader.readAsDataURL(file);
+    });
   }
 };
 
