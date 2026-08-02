@@ -798,6 +798,7 @@ thead th.sticky-col{background:var(--surface2);z-index:2}
         <button class="tab-btn" data-tab="branches" onclick="ManageView.openTab('branches')"><i class="ti ti-git-branch"></i> Branch/Dept</button>
         <button class="tab-btn" data-tab="classes" onclick="ManageView.openTab('classes')"><i class="ti ti-layout-grid"></i> Class/Section</button>
         <button class="tab-btn" data-tab="master" onclick="ManageView.openTab('master')"><i class="ti ti-database"></i> Master Data</button>
+        <button class="tab-btn" data-tab="subjects" onclick="ManageView.openTab('subjects')"><i class="ti ti-book"></i> Subjects</button>
       </div>
       <div id="manage-content"></div>
     </section>
@@ -1110,6 +1111,58 @@ Shyam,B2-07,TMSS2607,+91 7893281282,shyam@tmss.edu,+91 7893281282,@shyam_parent,
   </div>
 </div>
 
+<div class="modal-overlay" id="overlay-subject">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-subject-title">Add Subject</span>
+      <button class="icon-btn" onclick="Modals.close('subject')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="sub-id"/>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">Subject Code *</label>
+          <input type="text" id="sub-code" class="form-input" placeholder="e.g. CS302"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Subject Name</label>
+          <input type="text" id="sub-name" class="form-input" placeholder="e.g. Operating Systems"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Department</label>
+          <input type="text" id="sub-department" class="form-input" list="sub-dept-list" placeholder="e.g. Computer Science (or All)"/>
+          <datalist id="sub-dept-list"></datalist>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Class</label>
+          <input type="text" id="sub-class" class="form-input" list="sub-class-list" placeholder="e.g. 3rd Year (or All)"/>
+          <datalist id="sub-class-list"></datalist>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Section</label>
+          <input type="text" id="sub-section" class="form-input" list="sub-section-list" placeholder="e.g. A (or All)"/>
+          <datalist id="sub-section-list"></datalist>
+        </div>
+      </div>
+      <div class="section-divider">Lecture Time (optional — auto-fills the student's form)</div>
+      <div class="notice-duration-row">
+        <div class="form-group">
+          <label class="form-label">Start</label>
+          <input type="time" id="sub-start" class="form-input"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">End</label>
+          <input type="time" id="sub-end" class="form-input"/>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="Modals.close('subject')">Cancel</button>
+      <button class="btn btn-primary" id="sub-save-btn" onclick="SubjectMaster.save()"><i class="ti ti-check"></i> Save Subject</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="overlay-about">
   <div class="modal modal-sm">
     <div class="modal-header">
@@ -1174,6 +1227,7 @@ const State={
   
   categories: [], subCategories: [], subSubCategories: [],
   notices: [],
+  subjectMaster: [],
   
   subjects:['General','Mathematics','Science','English','History','Computer Science','Art & Design','Physical Education'],
   threshold:75, currentClassId:null, attendance:{}, csvPreviewData:[],
@@ -1236,6 +1290,7 @@ function saveAll(){
   DB.set('subCategories', State.subCategories);
   DB.set('subSubCategories', State.subSubCategories);
   DB.set('notices', State.notices);
+  DB.set('subjectMaster', State.subjectMaster);
 }
 
 /* ── Toast ── */
@@ -1586,6 +1641,13 @@ const Auth={
           State.subSubCategories = subSubCatRes.data;
           DB.set('subSubCategories', State.subSubCategories);
       }
+
+      const subjRes = await API.get('getSubjects');
+      if (subjRes && subjRes.success && subjRes.data) {
+          State.subjectMaster = subjRes.data;
+          DB.set('subjectMaster', State.subjectMaster);
+          if (App._current === 'manage' && ManageView._tab === 'subjects') SubjectMaster.render(document.getElementById('manage-content'));
+      }
       
     } catch(e) {
       console.error("Sync failed", e);
@@ -1623,6 +1685,7 @@ _loadData(){
     State.subCategories = DB.get('subCategories', []);
     State.subSubCategories = DB.get('subSubCategories', []);
     State.notices = DB.get('notices', []);
+    State.subjectMaster = DB.get('subjectMaster', []);
     // ----------------------------
     State.subjects=DB.get('subjects',['General','Mathematics','Science','English','Computer Science','Physics','Chemistry','Art & Design']);
     State.threshold=DB.get('threshold',75);
@@ -1993,7 +2056,13 @@ const ManageView={
     if(this._tab==='institutions')this._renderInstitutions(el);
     else if(this._tab==='branches')this._renderBranches(el);
     else if(this._tab==='classes')this._renderClasses(el);
-    else this._renderMasterData(el); // NEW ROUTE
+    else if(this._tab==='master')this._renderMasterData(el);
+    else this._renderSubjects(el); // NEW ROUTE
+  },
+
+  // NEW: RENDER SUBJECT MASTER LIST (backend-synced — feeds the Student app's Mark Attendance dropdown)
+  _renderSubjects(el){
+    SubjectMaster.render(el);
   },
   
   // NEW: RENDER MASTER DATA UPLOAD UI
@@ -3323,6 +3392,132 @@ const Notices={
       reader.onerror=reject;
       reader.readAsDataURL(file);
     });
+  }
+};
+
+const SubjectMaster={
+  loading:false,
+  _editingId:null,
+
+  render(el){
+    if(!el)return;
+    el.innerHTML=`
+      <div class="manage-section">
+        <div class="manage-section-header">
+          <div class="manage-section-title"><i class="ti ti-book"></i> Subjects <span style="font-weight:400;font-size:.72rem;color:var(--text3)">— feeds the Student app's Mark Attendance dropdown</span></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm" onclick="SubjectMaster.refresh()"><i class="ti ti-refresh"></i></button>
+            <button class="btn btn-sm btn-primary" onclick="SubjectMaster.openModal()"><i class="ti ti-plus"></i> Add Subject</button>
+          </div>
+        </div>
+        <div id="subject-master-list"></div>
+      </div>`;
+    this._drawList();
+    this.refresh(true);
+  },
+
+  async refresh(silent){
+    if(this.loading)return;
+    this.loading=true;
+    const res=await API.get('getSubjects');
+    this.loading=false;
+    if(res && res.success){
+      State.subjectMaster=(res.data||[]).sort((a,b)=>(a.department+a.class+a.section+a.code).localeCompare(b.department+b.class+b.section+b.code));
+      DB.set('subjectMaster',State.subjectMaster);
+      if(App._current==='manage' && ManageView._tab==='subjects')this._drawList();
+    } else if(!silent){
+      toast('Failed to refresh subjects','err');
+    }
+  },
+
+  _drawList(){
+    const el=document.getElementById('subject-master-list');
+    if(!el)return;
+    if(!State.subjectMaster.length){
+      el.innerHTML=`<div class="empty-state"><i class="ti ti-book-off"></i><h3>No subjects yet</h3><p style="font-size:.8rem;color:var(--text3);margin-top:4px">Tap "Add Subject" to create the first one — it'll show up in the Student app's dropdown immediately.</p></div>`;
+      return;
+    }
+    el.innerHTML=State.subjectMaster.map(s=>`
+      <div class="manage-item">
+        <div class="manage-item-dot" style="background:var(--accent)"></div>
+        <div class="manage-item-info">
+          <div class="manage-item-name">${escHtml(s.code)}${s.name?' — '+escHtml(s.name):''}</div>
+          <div class="manage-item-sub">${escHtml(s.department||'All')} · ${escHtml(s.class||'All')} · ${escHtml(s.section||'All')}${(s.lectureStart&&s.lectureEnd)?` · ${s.lectureStart}–${s.lectureEnd}`:''}</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-xs" onclick="SubjectMaster.openModal('${s.subjectId}')"><i class="ti ti-pencil"></i></button>
+          <button class="btn btn-xs btn-danger" onclick="SubjectMaster.remove('${s.subjectId}')"><i class="ti ti-trash"></i></button>
+        </div>
+      </div>`).join('');
+  },
+
+  _fillDatalist(id,values){
+    const dl=document.getElementById(id);if(!dl)return;
+    const uniq=[...new Set(values.filter(Boolean))];
+    dl.innerHTML=uniq.map(v=>`<option value="${escHtml(v)}"></option>`).join('');
+  },
+
+  openModal(subjectId){
+    this._editingId=subjectId||null;
+    document.getElementById('modal-subject-title').textContent=subjectId?'Edit Subject':'Add Subject';
+    document.getElementById('sub-id').value=subjectId||'';
+
+    this._fillDatalist('sub-dept-list',State.students.map(s=>s.department));
+    this._fillDatalist('sub-class-list',State.students.map(s=>s.classSem));
+    this._fillDatalist('sub-section-list',State.students.map(s=>s.section));
+
+    if(subjectId){
+      const s=(State.subjectMaster||[]).find(x=>x.subjectId===subjectId);
+      if(!s){toast('Subject not found locally — refresh and retry','err');return;}
+      document.getElementById('sub-code').value=s.code||'';
+      document.getElementById('sub-name').value=s.name||'';
+      document.getElementById('sub-department').value=s.department||'';
+      document.getElementById('sub-class').value=s.class||'';
+      document.getElementById('sub-section').value=s.section||'';
+      document.getElementById('sub-start').value=s.lectureStart||'';
+      document.getElementById('sub-end').value=s.lectureEnd||'';
+    } else {
+      ['sub-code','sub-name','sub-department','sub-class','sub-section','sub-start','sub-end'].forEach(id=>document.getElementById(id).value='');
+    }
+    Modals.open('subject');
+  },
+
+  async save(){
+    const code=document.getElementById('sub-code').value.trim();
+    if(!code)return toast('Subject code is required','err');
+
+    const payload={
+      subjectId:this._editingId||undefined,
+      code,
+      name:document.getElementById('sub-name').value.trim(),
+      department:document.getElementById('sub-department').value.trim()||'All',
+      class:document.getElementById('sub-class').value.trim()||'All',
+      section:document.getElementById('sub-section').value.trim()||'All',
+      lectureStart:document.getElementById('sub-start').value||'',
+      lectureEnd:document.getElementById('sub-end').value||''
+    };
+
+    const btn=document.getElementById('sub-save-btn');btn.disabled=true;
+    try{
+      const res=await API.post('saveSubject',payload);
+      if(res && res.success){
+        toast(this._editingId?'Subject updated':'Subject added');
+        Modals.close('subject');
+        await this.refresh();
+      } else {
+        toast('Failed to save subject'+(res&&res.error?(': '+res.error):''),'err');
+      }
+    } finally {
+      btn.disabled=false;
+    }
+  },
+
+  async remove(subjectId){
+    Confirm.show('Delete this subject? Students will no longer see it in their dropdown.',async()=>{
+      const res=await API.post('deleteSubject',{subjectId});
+      if(res && res.success){toast('Subject deleted');await this.refresh();}
+      else toast('Failed to delete subject','err');
+    },'Delete');
   }
 };
 
