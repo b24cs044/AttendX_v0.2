@@ -1194,11 +1194,66 @@ Shyam,B2-07,TMSS2607,+91 7893281282,shyam@tmss.edu,+91 7893281282,@shyam_parent,
 <div class="toast" id="toast"></div>
 
 <script>
-/* ═══════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════════
    AttendX — Full Application Script
-═══════════════════════════════════════════════════ */
+   ---------------------------------------------------------------------
+   Single-file PWA for classroom attendance management.
 
-/* ── DB ── */
+   ARCHITECTURE
+   • No build step / no framework — plain ES6, loaded as one inline
+     <script> block at the bottom of index.html.
+   • UI is organised as "screens" (login / setup / home) and "views"
+     (register, students, records, analytics, alerts, manage, notices)
+     which are plain <div>s toggled via CSS classes (see .screen/.view
+     rules in <style>). There is no virtual DOM — each module re-renders
+     by rebuilding innerHTML for its container element.
+   • Code is grouped into singleton "modules" (plain object literals
+     such as Auth, App, Register, Students, Classes, Records, Analytics,
+     ExportEngine, Notices, Alerts, ProfileModal, BackupEngine, etc).
+     Each module owns one feature area and the DOM elements for its view.
+   • State.* holds the single in-memory source of truth for the current
+     session. Modules read/write State directly, then persist via
+     saveAll()/DB.set() and re-render themselves.
+
+   PERSISTENCE
+   • DB (below) is a thin wrapper around window.localStorage, namespaced
+     with the prefix "ax2_" so multiple apps can share one origin safely.
+     This is the OFFLINE store — everything works with zero network.
+   • API (below) talks to a Google Apps Script (GAS) web app acting as a
+     lightweight cloud backend (Google Sheets as the DB). Sync is
+     best-effort / fire-and-forget: writes are saved locally first, then
+     mirrored to the cloud when navigator.onLine is true. There is no
+     conflict resolution — the cloud copy is treated as authoritative for
+     read-heavy master data (students, categories, subjects, notices),
+     while attendance records are written locally and pushed to the
+     cloud without waiting for confirmation.
+
+   NAVIGATION
+   • App.openView()/goHome() double as a tiny router. Every navigation
+     pushes a History API state entry so the Android/hardware/browser
+     back button steps back through views instead of leaving the app
+     (see the popstate listener near the end of this script).
+
+   AUTH & ROLES
+   • Auth handles account creation, login, "remember me" sessions, and
+     an optional biometric second factor (WebAuthn platform passkey,
+     with a PIN-hash fallback when WebAuthn is unavailable).
+   • Two roles: 'admin' (full access incl. Manage/master data) and
+     'teacher' (attendance + reporting only). applyRolePermissions()
+     toggles UI affordances based on the logged-in role.
+
+   NOTE ON NAMING
+   • Comments in this file describe the code as written. Some feature
+     names (e.g. the Bluetooth attendance shortcut) point at companion
+     pages that are not part of this single index.html file.
+═══════════════════════════════════════════════════════════════════════ */
+
+/* ── DB ──────────────────────────────────────────────────────────────
+   Tiny localStorage wrapper. All keys are namespaced ("ax2_" + key) so
+   this is effectively an offline key/value store for the whole app —
+   there is no IndexedDB use in this build. get() safely JSON-parses and
+   falls back to `fb` on any error (missing key, corrupt JSON, storage
+   disabled). set()/remove() mirror the two localStorage primitives. */
 const DB={
   NS:'ax2_',
   get(k,fb=null){try{const v=localStorage.getItem(this.NS+k);return v!==null?JSON.parse(v):fb}catch{return fb}},
@@ -1206,7 +1261,20 @@ const DB={
   remove(k){localStorage.removeItem(this.NS+k)}
 };
 
-/* ── Helpers ── */
+/* ── Helpers ─────────────────────────────────────────────────────────
+   Small stateless formatting/utility functions shared across modules:
+   uid() generates a "good enough" unique id (timestamp + random digits,
+   not cryptographically unique but fine for local records). fmtDate/
+   fmtDateTime format ISO strings for display (en-GB, day-month-year).
+   initials()/avatarColor() derive the two-letter avatar badge and a
+   deterministic colour from a student's name (simple char-code hash
+   into a fixed palette). attStatus()/attRemark() normalise an
+   attendance cell, which may be stored either as a bare string
+   ('present'/'absent') for legacy records or as {status, remark} for
+   newer ones. csvQ() quotes/escapes a value for CSV export. escHtml()
+   is the app's only HTML-escaping helper — always use it when
+   interpolating user-entered text into innerHTML to avoid XSS. fmtPct()
+   formats a present/total ratio as a percentage string. */
 const uid=()=> Date.now().toString() + Math.floor(1000 + Math.random() * 9000).toString();
 const fmtDate=d=>d?new Date(d+'T00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'—';
 const fmtDateTime=iso=>{if(!iso)return'—';const d=new Date(iso);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});};
@@ -1221,8 +1289,28 @@ const escHtml=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&
 /* Decimal percentage helper */
 const fmtPct=(present,total,decimals=1)=>total===0?'—':(present/total*100).toFixed(decimals)+'%';
 
-/* ── State ── */
-/* ── State ── */
+/* ── State ──────────────────────────────────────────────────────────
+   Single global in-memory store for the logged-in session. Populated
+   from localStorage on login (Auth._loadData) and written back with
+   saveAll()/DB.set() after most mutations. Shape:
+     users[]              all local accounts (see Auth.register)
+     loggedIn/currentUser  current session
+     institutions[]/activeInstitutionId   (Free plan: 1 active)
+     branches[]/activeBranchId            department/branch (1 active)
+     classes[]             class/section records, scoped to inst+branch
+     students[]            roster, each tagged with classId
+     records[]             saved attendance sessions (one per date+class)
+     categories/subCategories/subSubCategories   dept→class→section
+                            master data, mirrored from the GAS backend
+     notices[]             notice-board posts (synced from backend)
+     subjectMaster[]       subject master list (synced from backend)
+     subjects[]            legacy free-text subject list used by Classes
+     threshold             attendance % below which a student is "at risk"
+     currentClassId        class currently selected in the class chip bar
+     attendance             in-progress (unsaved) marks for Register view
+     csvPreviewData         parsed rows staged for the CSV import modal
+     studentsGrouped        Students view display toggle (A–Z vs flat)
+     _exportContext          which view triggered the export modal */
 const State={
   users:[], loggedIn:false, currentUser:null,
   institutions:[], activeInstitutionId:null,
@@ -1238,7 +1326,15 @@ const State={
   studentsGrouped:false, _exportContext:'records'
 };
 
-/* ── API Integration ── */
+/* ── API Integration ────────────────────────────────────────────────
+   Thin fetch() wrapper around a Google Apps Script (GAS) web app used
+   as the cloud backend (a Google Sheet is the database on the server
+   side). GET requests append `?action=` (+ optional query params);
+   POST requests send `{action, data}` as text/plain (avoids a CORS
+   preflight, which GAS web apps don't support well). Every call first
+   checks navigator.onLine and short-circuits to null when offline, so
+   callers must treat a null/!success response as "not synced yet" and
+   keep working from local State — the app never blocks on the network. */
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbz3jhbjsOFRetcmIpOaltXEl6EiZP63rhss5smHeVDIaF9r2eQMitcx8YugN1VAk_v5/exec';
 
 const API = {
@@ -1297,7 +1393,9 @@ function saveAll(){
   DB.set('subjectMaster', State.subjectMaster);
 }
 
-/* ── Toast ── */
+/* ── Toast ── small bottom-of-screen snackbar used for all transient
+   feedback (saved/error/info). type: '' | 'err' | 'success' toggles a
+   colour class; duration is in ms. */
 let toastTimer;
 function toast(msg,type='',duration=3000){
   const el=document.getElementById('toast');
@@ -1305,7 +1403,9 @@ function toast(msg,type='',duration=3000){
   clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),duration);
 }
 
-/* ── Modals ── */
+/* ── Modals ── generic open/close for any .modal-overlay by id
+   convention ('overlay-'+name). Clicking the dimmed backdrop closes
+   the modal (listener registered once below). */
 const Modals={
   open(name){document.getElementById('overlay-'+name)?.classList.add('open');},
   close(name){document.getElementById('overlay-'+name)?.classList.remove('open');}
@@ -1320,7 +1420,13 @@ const Confirm={
   }
 };
 
-/* ── RBAC / Guard Helper ── */
+/* ── RBAC / Guard Helper ────────────────────────────────────────────
+   applyRolePermissions() is called after every render that could show
+   admin-only controls (Manage tile, per-record/class delete buttons,
+   "Clear All" in Records). It is a UI-layer guard only — since all data
+   lives in the browser's localStorage there is no server-side
+   enforcement; a technical user could bypass it via devtools. Treat the
+   'admin' role as a UX convenience, not a security boundary. */
 function applyRolePermissions() {
   const isAdmin = State.currentUser?.role === 'admin';
   
@@ -1342,7 +1448,30 @@ function applyRolePermissions() {
   document.querySelectorAll('#records-content .btn-danger').forEach(btn => btn.style.display = isAdmin ? 'inline-flex' : 'none');
 }
 
-/* ══ AUTH ══ */
+/* ══ AUTH ══════════════════════════════════════════════════════════
+   Handles the login/register screen, session persistence, and the
+   optional biometric second factor.
+
+   Accounts: stored in State.users / DB('users') as plain objects
+   { id, username, password, role, biometric, credentialId, bioType,
+   theme }. Passwords are stored in PLAIN TEXT in localStorage — there
+   is no hashing. This is acceptable only because the app is single-
+   device / local-first; do not reuse this pattern if the backend ever
+   becomes the source of truth for auth.
+
+   Sessions: "Remember me" persists {username, role} to localStorage
+   (survives browser restarts); otherwise it's written to sessionStorage
+   (cleared when the tab closes). Auth.init() looks for either on boot
+   and auto-logs-in by re-matching username+role against State.users.
+
+   Biometric: on registration the user can opt into a WebAuthn platform
+   passkey (Touch ID / Windows Hello / Android biometric prompt — this
+   delegates to whatever authenticator the OS offers, the app does not
+   implement its own face/fingerprint capture). If WebAuthn is
+   unavailable (non-HTTPS, unsupported browser) it falls back to a
+   locally hashed 4–8 digit PIN (a simple non-cryptographic string hash,
+   NOT bcrypt/Argon2 — sufficient only as a low-friction local gate, not
+   real security). */
 const Auth={
   mode: 'login',
   
@@ -1482,6 +1611,11 @@ const Auth={
     else{inp.type='password';eye.innerHTML='<i class="ti ti-eye"></i>';}
   },
 
+  /* Registers a WebAuthn platform passkey for `user` (fingerprint/face/
+     PIN — whichever the OS authenticator offers). Requires HTTPS or
+     localhost. On success stores the credential's rawId (base64) as
+     user.credentialId with bioType 'webauthn'; on failure/unsupported
+     falls back to _setupPinBiometric(). */
   async _setupBiometric(user) {
     const canUseWebAuthn = window.PublicKeyCredential &&
       (window.location.protocol === 'https:' ||
@@ -1544,6 +1678,12 @@ const Auth={
     this._enterApp(user);
   },
 
+  /* Biometric sign-in from the login screen. Tries WebAuthn first
+     (navigator.credentials.get) against every locally registered
+     passkey user, matching the returned credential's rawId back to a
+     user; if no WebAuthn users exist (or the platform can't support
+     it) falls back to prompting for the shared biometric PIN and
+     checks it against each PIN-registered user's stored hash. */
   async biometric() {
     const bioUsers = State.users.filter(u => u.biometric && u.credentialId);
     if(!bioUsers.length) return toast('No biometric set up. Register first.', 'err');
@@ -1615,6 +1755,13 @@ const Auth={
     }
   },
 
+  /* Pulls the small "reference" datasets from the GAS backend on every
+     login (students, category/sub-category/sub-sub-category master
+     data, subject master) and overwrites the matching State.* array +
+     localStorage cache. Read-only for this app — these lists are
+     edited from Manage view (admin) and pushed back via API.post, not
+     mutated by this function. Silently no-ops offline or on error; the
+     app keeps running off whatever was cached from the last sync. */
   async _syncWithBackend() {
     if (!navigator.onLine) return;
     try {
@@ -1732,7 +1879,14 @@ _loadData(){
     InstallPrompt.onLogin();
   }
 };
-/* ══ SETUP WIZARD ══ */
+/* ══ SETUP WIZARD ═════════════════════════════════════════════════
+   First-run 3-step flow shown to a new admin: (1) create an
+   Institution, (2) create a Branch/Department, (3) confirmation screen
+   summarising the Free-plan limits (1 active institution, 1 active
+   branch, up to 3 class sections). Each step writes straight into
+   State + saveAll() so progress isn't lost if the tab is closed
+   mid-wizard. finish() hides the setup screen and hands off to
+   Auth._bootApp(). */
 const SetupWizard={
   step:0,
   start(){
@@ -1819,7 +1973,8 @@ const SetupWizard={
   }
 };
 
-/* ── Home Context Bar ── */
+/* ── Home Context Bar ── keeps the small institution/branch label +
+   colour dot on the Home screen in sync with State's active ids. */
 function updateHomeContext(){
   const inst=State.institutions.find(i=>i.id===State.activeInstitutionId);
   const br=State.branches.find(b=>b.id===State.activeBranchId);
@@ -1828,7 +1983,19 @@ function updateHomeContext(){
   document.getElementById('home-ctx-dot').style.background=br?.color||'var(--indigo)';
 }
 
-/* ══ APP ══ */
+/* ══ APP ══════════════════════════════════════════════════════════
+   The view router / shell controller. Views are plain <div id="view-…">
+   elements toggled with the .active class; App tracks which one is
+   current in App._current and drives the topbar title, the class-chip
+   selector bar, and per-view render() calls.
+
+   Back-button integration: every call to openView()/goHome() pushes a
+   History API entry ({axView:id}) unless it originated FROM a popstate
+   event itself (the `fromPop` flag), which prevents an infinite
+   push/pop loop. The listener near the bottom of this script
+   (window 'popstate') re-opens whatever view is in e.state, or goes
+   Home if state is null — this is what makes the hardware/browser back
+   button feel native instead of exiting the PWA immediately. */
 const viewNames={register:'Mark Attendance',records:'Records',analytics:'Analytics',alerts:'Alerts',students:'Students',manage:'Manage',notices:'Notice Board'};
 const App={
   _current:null,
@@ -1888,7 +2055,10 @@ const App={
   switchView(id){this.openView(id);}
 };
 
-/* ── Teacher Analytics Widget ── */
+/* ── Teacher Analytics Widget ── small stat cards injected into the
+   Home screen for non-admin (teacher) users only, summarising recent
+   session count and average attendance so teachers get a snapshot
+   without opening the full Analytics view. */
 const TeacherAnalytics = {
   renderDashboard() {
     const homeWrap = document.querySelector('.home-wrap');
@@ -1928,7 +2098,15 @@ const TeacherAnalytics = {
   }
 };
 
-/* ── Backup Engine ── */
+/* ── Backup Engine ──────────────────────────────────────────────────
+   Manual local backup/restore, independent of the cloud sync. exportLocal()
+   serialises the entire State-backed dataset to a downloadable .json
+   file (a full local snapshot: users, institutions, branches, classes,
+   students, records, subjects, master data, notices). importLocal()
+   reads such a file back in, overwriting current State + localStorage —
+   use with care, it is a full replace, not a merge. Intended as a
+   manual escape hatch (device migration, accidental data loss) rather
+   than the primary sync mechanism, which is the GAS cloud API above. */
 const BackupEngine = {
   exportLocal() {
     const backup = {
@@ -1982,7 +2160,9 @@ const BackupEngine = {
   }
 };
 
-/* ── Session type UI ── */
+/* ── Session type UI ── the pill selector for whether an attendance
+   session is a Lecture/Lab/Tutorial/etc; kept in sync between the
+   visible pill buttons and a hidden form field via a shared 'value'. */
 function buildSessionTypeUI(){
   const sel=document.getElementById('session-type-select');
   const txt=document.getElementById('session-type-text');
@@ -2016,7 +2196,9 @@ function setSessionTypeValue(val){
   else{sel.value='__other__';if(txt){txt.style.display='';txt.value=val;}}
 }
 
-/* ── Swatches ── */
+/* ── Swatches ── reusable colour-picker grid (used for institution,
+   branch and class colours) backed by a hidden input holding the
+   selected hex value. */
 const COLORS=['#2563eb','#16a34a','#eab308','#3b82f6','#1e3a8a','#0ea5e9','#0284c7','#22c55e','#15803d','#facc15'];
 function renderSwatches(containerId,hiddenId,selected){
   const c=document.getElementById(containerId);if(!c)return;
@@ -2028,7 +2210,9 @@ function selectSwatch(el,hiddenId){
   el.classList.add('selected');document.getElementById(hiddenId).value=el.dataset.color;
 }
 
-/* ── Subjects ── */
+/* ── Subjects ── manage-view CRUD for the legacy free-text subject
+   list (State.subjects) used as the default subject dropdown when
+   creating a Class. */
 const Subjects={
   openModal(){this.renderList();document.getElementById('new-subject-input').value='';Modals.open('subjects');},
   renderList(){
@@ -2047,7 +2231,11 @@ const Subjects={
   }
 };
 
-/* ══ MANAGE VIEW ══ */
+/* ══ MANAGE VIEW (Admin only) ═════════════════════════════════════
+   Tabbed admin console: Institutions, Branches, Classes, Subjects,
+   Categories/Sub-categories (department→class→section master data),
+   Subject Master, and CSV bulk-upload tools for master data. Gated in
+   App.openView() so non-admins are redirected Home with a toast. */
 const ManageView={
   _tab:'institutions',
   openTab(tab){
@@ -2337,7 +2525,12 @@ const ManageView={
   }
 };
 
-/* ── Classes ── */
+/* ── Classes ────────────────────────────────────────────────────────
+   CRUD for class/section records, each scoped to the active
+   institution+branch (institutionId/branchId foreign keys). Enforces
+   the Free-plan cap of 3 classes per active institution/branch pair
+   (see the maxFree/atLimit checks in ManageView) — this is a soft,
+   client-side-only limit. */
 const Classes={
   showAddModal(){
     if(!State.activeInstitutionId||!State.activeBranchId)return toast('Set institution and branch first','err');
@@ -2390,7 +2583,16 @@ const Classes={
   }
 };
 
-/* ── Register ── */
+/* ── Register ───────────────────────────────────────────────────────
+   The core attendance-marking screen. Renders the roster for
+   State.currentClassId, lets the teacher tap Present/Absent per
+   student (mark()), optionally attach an absence remark, then
+   submit() to persist the session as one record in State.records
+   (keyed by class+date; re-submitting the same date+class overwrites
+   the existing record rather than duplicating it when editing via
+   loadRecord()). On submit, the record is saved locally first (so it
+   is never lost if the network is down) and then mirrored to the GAS
+   backend with API.post('markAttendance', …) fire-and-forget. */
 const Register={
   clearState(){
     State.attendance={};setSessionTypeValue('');
@@ -2471,6 +2673,14 @@ const Register={
     this.render();
   },
   cancelEdit(){this.clearState();this.render();},
+  /* Persists the in-progress State.attendance object as one record for
+     the current class+date. If editing an existing record (edit-notice
+     banner has an id in its dataset) the old record with that id is
+     replaced rather than duplicated; otherwise a new record id is
+     minted. Warns (but allows proceeding) if not every student has
+     been marked. Saves to localStorage synchronously, then fires an
+     unawaited API.post('markAttendance', …) to mirror the record to
+     the cloud — the UI does not wait for or block on that request. */
   submit(){
     if(!State.currentClassId)return toast('Select a class first','err');
     const total=State.students.filter(s=>s.classId===State.currentClassId).length;
@@ -2506,7 +2716,13 @@ const Register={
   }
 };
 
-/* ── Students ── */
+/* ── Students ───────────────────────────────────────────────────────
+   Roster management for the active class: add/edit/delete students,
+   CSV bulk-import (name required; roll_number, student_id, mobile,
+   email, parent_mobile/telegram/email, class_sem, section, department
+   optional — see the upload hint text in the HTML), and an A–Z grouped
+   view toggle. Each student is tagged with classId to scope it to one
+   class/section. */
 const Students={
   toggleGrouping(){
     State.studentsGrouped=!State.studentsGrouped;
@@ -2711,7 +2927,12 @@ const Students={
   }
 };
 
-/* ── Records ── */
+/* ── Records ────────────────────────────────────────────────────────
+   Read view over saved attendance sessions (State.records) for the
+   current class: lists each session with computed present/absent
+   counts and a colour-coded percentage, expandable to see individual
+   student marks, with edit (loads back into Register) and admin-only
+   delete actions. */
 const Records={
   render(){
     const el=document.getElementById('records-content');if(!el)return;
@@ -2773,7 +2994,12 @@ const Records={
   showExportModal(){State._exportContext='records';document.getElementById('export-modal-title').textContent='Export Records';Modals.open('export');}
 };
 
-/* ══ EXPORT ENGINE ══ */
+/* ══ EXPORT ENGINE ════════════════════════════════════════════════
+   Generates downloadable CSV files from local State — no server round
+   trip. Three export shapes: per-session detail (one row per student
+   per date), per-student summary (aggregate % across all sessions),
+   and a date-range export. All values are passed through csvQ() for
+   proper CSV quoting/escaping before being joined and blobbed. */
 const ExportEngine={
   run(){
     const fmt=document.querySelector('input[name="export-fmt"]:checked')?.value||'csv-detailed';
@@ -2860,7 +3086,12 @@ const ExportEngine={
   }
 };
 
-/* ── Analytics ── */
+/* ── Analytics ──────────────────────────────────────────────────────
+   Computes and renders the at-a-glance attendance analytics for the
+   current class: per-student percentage table (colour-flagged when
+   below State.threshold), plus lightweight hand-rolled SVG bar charts
+   (no charting library — see the manual <svg> construction further
+   down) for trend/distribution views. */
 const Analytics={
   threshold:75,
   updateThreshold(val){
@@ -3167,7 +3398,10 @@ const SubjectReport={
   }
 };
 
-/* ── Alerts View ── */
+/* ── Alerts View ────────────────────────────────────────────────────
+   Surfaces students with recent/at-risk absence patterns for the
+   active class so a teacher can jump straight into composing a parent
+   alert (see the Alerts module below) for any flagged student. */
 const AlertsView={
   render(){
     const el=document.getElementById('alerts-content');if(!el)return;
@@ -3565,7 +3799,20 @@ const Alerts={
   mockSend(){Modals.close('alert');toast('Alert sent (mock)!');}
 };
 
-/* ── Master Data Uploader ── */
+/* ── Master Data Uploader ──────────────────────────────────────────
+   Generic CSV → cloud importer used by the Manage view's bulk-upload
+   buttons for Category / Sub-category / Sub-sub-category master data.
+   Parses the CSV client-side into row objects keyed by lower-cased
+   header names, then POSTs the whole array to the matching GAS
+   endpoint (importCategories/importSubCategories/importSubSubCategories)
+   in one request; on success it re-triggers Auth._syncWithBackend() so
+   the freshly imported data flows back into local State immediately. */
+/* Parses a CSV file client-side (header row → lower-cased keys, naive
+   comma-split — does not handle quoted commas within a field) and
+   bulk-uploads the resulting rows to one of the three master-data
+   import endpoints based on `type` ('category'|'subcat'|'subsubcat').
+   On success, re-triggers a full backend sync so the newly imported
+   rows appear immediately without a manual refresh. */
 function uploadMasterDataCSV(fileInput, type) {
   const file = fileInput.files[0];
   if (!file) return;
@@ -3615,7 +3862,11 @@ function uploadMasterDataCSV(fileInput, type) {
   reader.readAsText(file);
 }
 
-/* ══ PROFILE MODAL ══ */
+/* ══ PROFILE MODAL ═══════════════════════════════════════════════
+   Self-service account settings reachable from the Home screen avatar:
+   display name/email/designation/department/phone, theme (light/dark,
+   applied instantly via body[data-theme]), and the manual JSON
+   backup/restore actions (delegates to BackupEngine). */
 const ProfileModal={
   _initials(name){
     if(!name)return'?';
@@ -3703,7 +3954,14 @@ const ProfileModal={
   }
 };
 
-/* ══ INSTALL PROMPT ══ */
+/* ══ INSTALL PROMPT ═══════════════════════════════════════════════
+   Wraps the browser's native "Add to Home Screen" flow. Chromium fires
+   `beforeinstallprompt`, which is captured and deferred so the app can
+   show it on its own terms (a friendly modal after first login, once
+   per session) instead of the browser's default mini-bar. iOS Safari
+   has no such event, so _isIOS() is used to instead show manual
+   "Share → Add to Home Screen" instructions. _isStandalone() detects
+   an already-installed PWA so the prompt never nags an installed user. */
 const InstallPrompt={
   _deferred:null,
   _shownModal:false,
@@ -3758,7 +4016,11 @@ const InstallPrompt={
 
 function installPWA(){InstallPrompt.install();}
 
-/* ══ SERVICE WORKER ══ */
+/* ══ SERVICE WORKER ═══════════════════════════════════════════════
+   Registers /service-worker.js (see that file for the actual caching
+   strategy: network-first for navigations, cache-first for known CDN
+   origins, stale-while-revalidate for everything else) so the app
+   shell keeps working offline once it has been opened at least once. */
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('/service-worker.js').then(
@@ -3768,7 +4030,12 @@ if('serviceWorker' in navigator){
   });
 }
 
-/* ══ HISTORY / BACK BUTTON ══ */
+/* ══ HISTORY / BACK BUTTON ═══════════════════════════════════════
+   Single popstate listener that makes the device/browser back button
+   navigate within the app (view → view → Home) instead of leaving it.
+   See App.openView()/goHome() above for the matching pushState calls.
+   Only active once logged in — before login, back behaves like a
+   normal page. */
 window.addEventListener('popstate',(e)=>{
   if(!State.loggedIn)return;
   const v=e.state?.axView;
@@ -3776,7 +4043,12 @@ window.addEventListener('popstate',(e)=>{
   else App.goHome(true);
 });
 
-/* ══ BOOT ══ */
+/* ══ BOOT ═════════════════════════════════════════════════════════
+   Entry point, run once on DOMContentLoaded: replaces the initial
+   history entry with a clean {axView:null} baseline, wires up the
+   install-prompt listeners, then hands control to Auth.init(), which
+   decides whether to show Login, Register, or auto-resume a saved
+   session. */
 window.addEventListener('DOMContentLoaded',()=>{
   history.replaceState({axView:null},'',location.pathname);
   InstallPrompt.init();
