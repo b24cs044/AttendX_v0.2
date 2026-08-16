@@ -1,0 +1,604 @@
+AttendX
+
+User Manual
+
+Attendance Tracking & Management Portal — for Teachers & Admins
+
+Progressive Web App (PWA) · Version 1.3.2
+
+Contents
+
+1. Introduction
+
+2. Installing AttendX on Your Device
+
+3. Creating an Account & Signing In
+
+4. Biometric / PIN Login
+
+5. First-Time Setup (Admin)
+
+6. Home Screen Overview
+
+7. Marking Attendance
+
+8. Managing Students
+
+9. Viewing Attendance Records
+
+10. Analytics & Subject Reports
+
+11. Sending Parent Alerts
+
+12. Notice Board
+
+13. Manage (Admin Only)
+
+14. Your Profile & Settings
+
+15. Working Offline
+
+16. Roles: Admin vs Teacher
+
+17. Free Plan Limits
+
+18. Troubleshooting & FAQ
+
+1. Introduction
+
+AttendX is a mobile-friendly attendance tracking app for schools,
+colleges, and coaching institutes. Teachers use it to mark daily
+attendance in seconds, while admins use it to set up institutions,
+classes, and student rosters, and to review attendance trends across the
+board.
+
+AttendX installs like a native app (no app-store download needed) and
+keeps working even when your internet connection drops — attendance you
+mark offline is saved on your device and quietly synced to the cloud the
+next time you're online.
+
+Who is this manual for?
+
+-   Teachers who need to mark attendance, view records, and check
+    student attendance percentages.
+
+-   Admins/institution owners who set up institutions, branches,
+    classes, student rosters, and manage master data.
+
+  -----------------------------------------------------------------------
+  Note: AttendX has two account roles — Admin and Teacher. Some screens
+  described in this manual (like Manage) are visible to Admins only. See
+  Section 16 for a full comparison.
+
+  -----------------------------------------------------------------------
+
+2. Installing AttendX on Your Device
+
+AttendX is a Progressive Web App (PWA) — you install it straight from
+your browser, and it then behaves like a normal app: its own icon,
+full-screen window, and offline access.
+
+Android / Desktop Chrome
+
++-----+----------------------------------------------------------------+
+| 1   | Open AttendX in Chrome                                         |
+|     |                                                                |
+|     | Visit the AttendX web address in Chrome on your phone or       |
+|     | computer.                                                      |
++-----+----------------------------------------------------------------+
+| 2   | Look for the install prompt                                    |
+|     |                                                                |
+|     | After you sign in, AttendX shows an “Install AttendX” card     |
+|     | automatically. You can also tap the “Install App” button on    |
+|     | the Home screen.                                               |
++-----+----------------------------------------------------------------+
+| 3   | Tap Install                                                    |
+|     |                                                                |
+|     | Confirm the browser's install dialog. AttendX now appears as   |
+|     | an app icon on your home screen / app list.                    |
++-----+----------------------------------------------------------------+
+
+iPhone / iPad (Safari)
+
++-----+----------------------------------------------------------------+
+| 1   | Open AttendX in Safari                                         |
+|     |                                                                |
+|     | iOS Safari doesn't support one-tap installs, so a short manual |
+|     | step is needed.                                                |
++-----+----------------------------------------------------------------+
+| 2   | Tap the Share icon                                             |
+|     |                                                                |
+|     | The square-with-arrow icon in Safari's toolbar.                |
++-----+----------------------------------------------------------------+
+| 3   | Choose “Add to Home Screen”                                    |
+|     |                                                                |
+|     | AttendX will then appear as an app icon and open full-screen,  |
+|     | just like Android.                                             |
++-----+----------------------------------------------------------------+
+
+  -----------------------------------------------------------------------
+  Tip: Installing is optional — AttendX works fine in a regular browser
+  tab too. Installing simply makes it faster to open and gives you a
+  proper offline app icon.
+
+  -----------------------------------------------------------------------
+
+3. Creating an Account & Signing In
+
+Creating your first account
+
++-----+----------------------------------------------------------------+
+| 1   | Open AttendX                                                   |
+|     |                                                                |
+|     | If no accounts exist on this device yet, you'll land straight  |
+|     | on the Register form.                                          |
++-----+----------------------------------------------------------------+
+| 2   | Choose your role                                               |
+|     |                                                                |
+|     | Select Admin (institution owner / sets up the system) or       |
+|     | Teacher (marks attendance day-to-day).                         |
++-----+----------------------------------------------------------------+
+| 3   | Enter a username & password                                    |
+|     |                                                                |
+|     | Pick something memorable — this account lives on this device.  |
++-----+----------------------------------------------------------------+
+| 4   | Tap Register                                                   |
+|     |                                                                |
+|     | Your account is created and you're signed in immediately.      |
++-----+----------------------------------------------------------------+
+
+  -----------------------------------------------------------------------
+  Note: Accounts are stored on the device you register on. If you use
+  AttendX on a new phone or a different browser, you'll need to register
+  there too (or, as Admin, you can restore a backup — see Section 14).
+
+  -----------------------------------------------------------------------
+
+Signing in later
+
+-   Open AttendX, choose your role, enter your username and password,
+    and tap Sign In.
+
+-   Tick “Remember me” to stay signed in between visits — otherwise
+    you're signed out when you close the browser tab.
+
+-   If your account and role don't match (e.g. you registered as Teacher
+    but select Admin), AttendX will tell you to pick the correct role.
+
+4. Biometric / PIN Login
+
+Right after registering, AttendX offers to set up a faster sign-in using
+your device's fingerprint, face unlock, or a short PIN — so you don't
+have to type your password every time.
+
+How it works
+
+-   If your device/browser supports it, AttendX uses your phone or
+    laptop's built-in fingerprint/face unlock (this uses your device's
+    own secure authenticator — AttendX never sees or stores your actual
+    fingerprint/face data).
+
+-   If that isn't available (for example, older devices, or the site
+    isn't loaded over a secure https:// connection), you'll instead be
+    asked to set a 4–8 digit PIN. This PIN is stored only on your
+    device.
+
+Using it to sign in
+
+1.  On the login screen, tap “Use Biometric.”
+
+2.  Follow your device's fingerprint/face prompt, or enter your PIN if
+    that's what you set up.
+
+3.  You're signed straight in — no need to type your username or
+    password.
+
+  -----------------------------------------------------------------------
+  Note: Forgot your PIN? There's no PIN reset — simply sign in the normal
+  way with your username and password instead.
+
+  -----------------------------------------------------------------------
+
+5. First-Time Setup (Admin)
+
+The very first time an Admin account signs in (and no institution has
+been set up yet), AttendX walks you through a quick 3-step setup wizard.
+
++-----+----------------------------------------------------------------+
+| 1   | Institution                                                    |
+|     |                                                                |
+|     | Enter your institution's name (e.g. your school or college     |
+|     | name) and pick a colour to identify it.                        |
++-----+----------------------------------------------------------------+
+| 2   | Branch / Department                                            |
+|     |                                                                |
+|     | Add your first branch or department (e.g. “CSE”, “Commerce”,   |
+|     | “Class Sections”) and its colour.                              |
++-----+----------------------------------------------------------------+
+| 3   | Confirmation                                                   |
+|     |                                                                |
+|     | Review a summary and tap “Enter Portal” to finish. You can add |
+|     | more institutions/branches/classes later from Manage.          |
++-----+----------------------------------------------------------------+
+
+  -----------------------------------------------------------------------
+  Note: On the Free plan, only 1 institution and 1 branch can be active
+  at a time, with up to 3 classes per branch. See Section 17 for details.
+
+  -----------------------------------------------------------------------
+
+6. Home Screen Overview
+
+After signing in, you land on the Home screen — your launchpad into
+every feature. The tiles you see depend on your role:
+
+  -----------------------------------------------------------------------
+  Tile              What it does                              Who sees it
+  ----------------- ----------------------------------------- -----------
+  Mark Attendance   Take today's roll call for a class        Everyone
+
+  Records           Browse previously saved attendance        Everyone
+                    sessions                                  
+
+  Analytics         Attendance % trends and subject-wise      Everyone
+                    reports                                   
+
+  Alerts            Compose absence/monthly notices for       Everyone
+                    parents                                   
+
+  Students          View and manage the class roster          Everyone
+
+  Manage            Institutions, branches, classes & master  Admin only
+                    data                                      
+
+  Notice Board      Institution-wide announcements            Everyone
+  -----------------------------------------------------------------------
+
+At the top of Home you'll see your current institution and branch (with
+a colour dot). Tap your avatar in the corner to open your Profile.
+
+7. Marking Attendance
+
+This is the everyday screen you'll use most — open it from the “Mark
+Attendance” tile.
+
++-----+----------------------------------------------------------------+
+| 1   | Pick a class                                                   |
+|     |                                                                |
+|     | Use the class chips at the top to switch between class         |
+|     | sections. Admins can add a new class here with the “+” chip.   |
++-----+----------------------------------------------------------------+
+| 2   | Check the date & session type                                  |
+|     |                                                                |
+|     | The date defaults to today. Choose a session type (e.g.        |
+|     | Lecture/Lab/Tutorial) if your institution uses them.           |
++-----+----------------------------------------------------------------+
+| 3   | Mark each student                                              |
+|     |                                                                |
+|     | Tap P for Present or A for Absent next to each name. Tapping   |
+|     | the same button again clears the mark.                         |
++-----+----------------------------------------------------------------+
+| 4   | Add a remark (optional)                                        |
+|     |                                                                |
+|     | When a student is marked Absent, a small note field appears    |
+|     | where you can jot a reason (e.g. “Informed — sick”).           |
++-----+----------------------------------------------------------------+
+| 5   | Use search to find someone fast                                |
+|     |                                                                |
+|     | Type a name or roll number into the search box to filter a     |
+|     | long roster.                                                   |
++-----+----------------------------------------------------------------+
+| 6   | Submit                                                         |
+|     |                                                                |
+|     | Tap Submit at the bottom. If some students are still unmarked, |
+|     | AttendX will double-check before saving.                       |
++-----+----------------------------------------------------------------+
+
+Editing a session you already saved
+
+Open Records, find the session, and tap Edit — it loads back into the
+Mark Attendance screen with your original marks, ready to adjust and
+re-submit. Saving again updates that same session rather than creating a
+duplicate.
+
+  -----------------------------------------------------------------------
+  Note: Attendance is saved on your device the instant you tap Submit —
+  even with no internet connection. It's then quietly sent to the cloud
+  in the background whenever you're back online.
+
+  -----------------------------------------------------------------------
+
+8. Managing Students
+
+Adding students one at a time
+
+-   Open Students, select the class, and tap Add Student.
+
+-   Fill in name and roll number (required), and optionally student ID,
+    mobile, email, and parent contact details (mobile / Telegram /
+    email) — these are used later for parent Alerts.
+
+Bulk import via CSV
+
+For large rosters, import a spreadsheet instead of typing each student:
+
+4.  Open Students → Import CSV.
+
+5.  Prepare a .csv file with a name column (required). Optional columns:
+    roll_number, student_id, mobile, email, parent_mobile,
+    parent_telegram, parent_email, class_sem, section, department.
+
+6.  Upload the file — AttendX shows a preview before committing the
+    import.
+
+7.  Confirm to add all the rows to the selected class.
+
+Other student tools
+
+-   A–Z / grouped view — toggle to browse students grouped
+    alphabetically.
+
+-   Search — filter the roster by name or roll number.
+
+-   Edit / Delete — update or remove a student record (deleting a
+    student does not remove their historical attendance already saved in
+    past records).
+
+9. Viewing Attendance Records
+
+The Records screen lists every attendance session saved for the
+currently selected class, most recent first.
+
+-   Each entry shows the date, session type, and a colour-coded
+    Present/Absent percentage for that session.
+
+-   Tap a session to expand it and see exactly how each student was
+    marked.
+
+-   Use Edit to reopen a session in Mark Attendance and correct it.
+
+-   Admins can delete individual sessions, or use “Clear All” to wipe
+    every record for the class (teachers cannot delete records).
+
+-   Use Export to download the records as a CSV file — see the export
+    options in Section 10.
+
+10. Analytics & Subject Reports
+
+Class Analytics
+
+Open Analytics to see a per-student attendance percentage table for the
+selected class. Students below the attendance threshold (75% by default)
+are highlighted so you can spot at-risk students at a glance. Simple bar
+charts show attendance trends over time and how students compare to each
+other.
+
+Subject Report
+
+A separate report lets you break attendance down by subject where
+subject-wise sessions are recorded, useful for departments that track
+per-subject attendance rather than just per-class.
+
+Exporting data
+
+From Records or Analytics you can export to CSV in a few shapes:
+
+  -----------------------------------------------------------------------
+  Export type             What you get
+  ----------------------- -----------------------------------------------
+  Session detail          One row per student per session — good for
+                          audits.
+
+  Student summary         One row per student with their overall
+                          attendance %.
+
+  Date range              Sessions filtered to a specific from/to date
+                          range.
+  -----------------------------------------------------------------------
+
+11. Sending Parent Alerts
+
+Open Alerts (or tap a flagged student in the Alerts tab) to draft a
+message to a parent/guardian — either a single-day absence notice or a
+monthly attendance summary.
+
++-----+----------------------------------------------------------------+
+| 1   | Pick a student                                                 |
+|     |                                                                |
+|     | AttendX auto-fills the message using that student's name, roll |
+|     | number, class, and institution.                                |
++-----+----------------------------------------------------------------+
+| 2   | Review the channels                                            |
+|     |                                                                |
+|     | Any parent contact details on file (SMS number, email,         |
+|     | Telegram) are shown, along with a full preview of the message  |
+|     | text.                                                          |
++-----+----------------------------------------------------------------+
+| 3   | Send                                                           |
+|     |                                                                |
+|     | Tap Send to dispatch it.                                       |
++-----+----------------------------------------------------------------+
+
+  -----------------------------------------------------------------------
+  Note: This is a preview/composer tool — if no parent contact details
+  are on file for a student, add them from Students first (Section 8).
+
+  -----------------------------------------------------------------------
+
+12. Notice Board
+
+A shared announcements feed visible to everyone signed in. Admins can
+post, edit, and delete notices; teachers and other users can read them.
+
+Posting a notice (Admin)
+
+8.  Open Notice Board → Post Notice.
+
+9.  Enter a topic and description (both required).
+
+10. Optionally target it to a specific department, class, or section —
+    leave blank to show it to everyone.
+
+11. Choose a single date, or a from/to date range for multi-day notices.
+
+12. Optionally attach a file (e.g. a circular or PDF).
+
+13. Tap Post Notice.
+
+A small badge on the Notice Board tile shows how many notices you
+haven't read yet.
+
+13. Manage (Admin Only)
+
+The Manage screen is the admin control centre for the structure of your
+institution and shared reference data. It's organised into tabs:
+
+  -----------------------------------------------------------------------
+  Tab                    Purpose
+  ---------------------- ------------------------------------------------
+  Institutions           Add/edit/switch institutions (Free plan: 1
+                         active at a time).
+
+  Branches               Add/edit/switch branches or departments within
+                         the active institution.
+
+  Classes                Add/edit/delete class sections within the active
+                         branch (Free plan: up to 3).
+
+  Subjects               Maintain the simple subject list used when
+                         creating classes.
+
+  Categories /           Department → Class → Section master data, used
+  Sub-categories /       across the app for tagging and reporting.
+  Sub-sub-categories     
+
+  Subject Master         A more detailed subject list shared with
+                         reporting.
+  -----------------------------------------------------------------------
+
+Bulk-uploading master data
+
+Categories, sub-categories, and sub-sub-categories can each be
+bulk-imported from a CSV file, the same way student rosters are — useful
+when setting up a new institution with many departments/classes/sections
+at once.
+
+14. Your Profile & Settings
+
+Tap your avatar on the Home screen to open your profile.
+
+-   Personal info — display name, email, designation, department, phone,
+    and a secondary email.
+
+-   Theme — switch between Light and Dark mode; it applies instantly.
+
+-   Backup & Restore — Export downloads a complete backup of your data
+    (institutions, branches, classes, students, records, notices, etc.)
+    as a .json file. Import restores from a backup file — note this
+    replaces your current data, so use it carefully.
+
+-   Sign Out — ends your session on this device.
+
+  -----------------------------------------------------------------------
+  Note: Back up regularly if you rely on AttendX as your primary
+  attendance record — Export creates a file you can store safely (e.g. in
+  cloud storage or email it to yourself).
+
+  -----------------------------------------------------------------------
+
+15. Working Offline
+
+AttendX is designed to keep working with no signal:
+
+-   Once you've opened AttendX at least once, the app itself (screens,
+    buttons, styling) continues to load even with airplane mode on.
+
+-   Attendance you mark offline is saved immediately on your device —
+    nothing is lost.
+
+-   When your connection returns, AttendX quietly syncs your changes to
+    the cloud in the background; there's no “sync” button to press.
+
+-   Actions that need live data from other users (like refreshing the
+    Notice Board with a new post from someone else) will simply show
+    your last-known copy until you're back online.
+
+16. Roles: Admin vs Teacher
+
+  -----------------------------------------------------------------------------
+  Capability                              Admin             Teacher
+  --------------------------------------- ----------------- -------------------
+  Mark attendance                         Yes               Yes
+
+  View records & analytics                Yes               Yes
+
+  Send parent alerts                      Yes               Yes
+
+  Add/edit/delete students                Yes               Yes
+
+  Delete attendance records               Yes               No
+
+  Access Manage                           Yes               No
+  (institutions/branches/classes/master                     
+  data)                                                     
+
+  Post/edit/delete notices                Yes               No (read-only)
+  -----------------------------------------------------------------------------
+
+17. Free Plan Limits
+
+AttendX's Free plan keeps things simple with a few soft limits, shown
+during setup and enforced in the Manage screen:
+
+-   1 active institution at a time.
+
+-   1 active branch/department at a time.
+
+-   Up to 3 class sections per active institution + branch combination.
+
+  -----------------------------------------------------------------------
+  Note: These limits apply to how many institutions/branches/classes can
+  be active at once, not to the number of students or attendance records
+  you can store.
+
+  -----------------------------------------------------------------------
+
+18. Troubleshooting & FAQ
+
+I can't sign in — “Account exists, but not as a…”
+
+You selected the wrong role. Every account is registered as either Admin
+or Teacher — reselect the correct role next to your username and try
+again.
+
+The Biometric button isn't showing
+
+It only appears once at least one account on this device has biometric
+login set up, and it requires a secure (https) connection or localhost —
+it won't appear on an insecure http:// address.
+
+My attendance didn't seem to sync
+
+Check you're connected to the internet — AttendX always saves locally
+first, so your data is safe, but cloud sync only happens while online.
+It will catch up automatically next time you're connected.
+
+I accidentally imported the wrong backup file
+
+Restoring a backup fully replaces your current data. If you have a more
+recent Export file, import that one to recover; otherwise data changed
+since your last backup cannot be recovered.
+
+A student's attendance % looks wrong
+
+Percentages are calculated only from sessions where that student was
+actually marked Present or Absent — students who were never marked in a
+session aren't counted for it.
+
+Where is the Bluetooth Attendance option?
+
+An automatic Bluetooth-based attendance shortcut is present in the
+interface but currently disabled/hidden pending its companion feature;
+it is not active in this version.
+
+— End of User Manual —

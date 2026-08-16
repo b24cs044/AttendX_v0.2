@@ -1,0 +1,697 @@
+AttendX
+
+Technical Documentation
+
+Architecture, Data Model, and Implementation Notes
+
+Cache v1.3.2 · Single-file Vanilla-JS PWA
+
+Contents
+
+1. System Overview
+
+2. Technology Stack
+
+3. File / Project Structure
+
+4. PWA Configuration (manifest.json)
+
+5. Service Worker & Caching Strategy
+
+6. Application Architecture
+
+7. Client-Side Data Model (State)
+
+8. Persistence Layer (localStorage)
+
+9. Backend Integration (Google Apps Script API)
+
+10. Authentication & Session Management
+
+11. Role-Based Access Control
+
+12. Client-Side Routing / History Handling
+
+13. Module Reference
+
+14. UI & Theming
+
+15. Business Rules & Plan Limits
+
+16. Known Limitations & Security Notes
+
+17. Deployment Notes
+
+1. System Overview
+
+AttendX is a single-file, installable Progressive Web App (PWA) for
+classroom attendance management, built for two roles — Admin and
+Teacher. It is “local-first”: all working data lives in the browser's
+localStorage and the UI is always usable offline, while a lightweight
+Google Apps Script (GAS) backend (backed by a Google Sheet) provides
+best-effort cloud sync for master data, attendance records, and notices.
+
+There is no build pipeline, bundler, or JS framework. index.html
+contains the entire application: markup, CSS, and a single inline
+<script> implementing the whole client. This keeps deployment to “upload
+3 static files” but means all application logic lives in one ~150KB
+script block, organised into cohesive module objects (see Section 13).
+
+2. Technology Stack
+
+  -----------------------------------------------------------------------
+  Layer               Technology
+  ------------------- ---------------------------------------------------
+  Markup / styling    Plain HTML5 + hand-written CSS (custom properties
+                      for theming, no CSS framework)
+
+  Application logic   Vanilla ES6 JavaScript (no React/Vue/Angular, no
+                      bundler, no TypeScript)
+
+  Icons               Tabler Icons webfont (via jsDelivr CDN)
+
+  Fonts               Google Fonts — Inter (UI) and JetBrains Mono
+                      (monospace elements)
+
+  Offline support     Service Worker (Cache API) + Web App Manifest
+
+  Local persistence   Browser localStorage (namespaced key/value store,
+                      no IndexedDB)
+
+  Cloud backend       Google Apps Script Web App (doGet/doPost)
+                      reading/writing a Google Sheet
+
+  Auth (optional 2nd  WebAuthn (platform passkey) with a local PIN-hash
+  factor)             fallback
+  -----------------------------------------------------------------------
+
+3. File / Project Structure
+
+index.html Entire application: <head> (meta/manifest/fonts),
+<style> (all CSS), HTML markup for every screen/
+view/modal, and a closing <script> with all JS.
+manifest.json Web App Manifest — PWA install metadata.
+service-worker.js Offline caching logic, registered from index.html.
+icons/ App icons referenced by manifest.json (not bundled
+with this documentation set — see Section 4).
+
+  -----------------------------------------------------------------------
+  Note: Because everything ships in one HTML file, there are no
+  import/export module boundaries at the file level — internal
+  organisation instead relies on the object-literal “modules” described
+  in Section 13, plus banner comments in the source dividing each
+  section.
+
+  -----------------------------------------------------------------------
+
+4. PWA Configuration (manifest.json)
+
+Defines how AttendX behaves once installed to a home screen / app
+launcher:
+
+  -----------------------------------------------------------------------------
+  Field               Value                Effect
+  ------------------- -------------------- ------------------------------------
+  name / short_name   AttendX              Full and short app names shown by
+                                           the OS.
+
+  start_url           /index.html          Page opened when the installed app
+                                           icon is launched.
+
+  scope               /                    URLs the installed app is allowed to
+                                           navigate within.
+
+  display             standalone           Runs in its own window — no browser
+                                           address bar/tabs.
+
+  orientation         portrait-primary     Locks the app to portrait
+                                           orientation on mobile.
+
+  background_color /  #0f1117              Splash-screen background and OS
+  theme_color                              chrome tint (matches the app's dark
+                                           theme).
+
+  icons               3 entries            App icons for launcher, splash
+                      (192/512/maskable)   screen, and adaptive-icon (Android
+                                           maskable) contexts.
+  -----------------------------------------------------------------------------
+
+  -----------------------------------------------------------------------
+  Note: index.html also sets a separate <meta name="theme-color"
+  content="#f8fafc"> (a light value) which governs the browser UI colour
+  on first paint before the manifest's dark theme_color takes over on
+  some platforms — this mismatch is intentional/cosmetic, not a bug, but
+  is worth aligning if the default theme changes.
+
+  -----------------------------------------------------------------------
+
+5. Service Worker & Caching Strategy
+
+service-worker.js implements three different caching strategies
+depending on the type of request, registered from index.html on window
+'load':
+
+  --------------------------------------------------------------------------
+  Request type          Strategy                 Rationale
+  --------------------- ------------------------ ---------------------------
+  Navigations (loading  Network-first, fallback  Always serve the freshest
+  index.html)           to cache                 shell when online; still
+                                                 load something when
+                                                 offline.
+
+  Known CDN origins     Cache-first, fallback to These assets are
+  (Google Fonts,        network                  effectively
+  jsDelivr)                                      static/versioned — skip the
+                                                 network once cached.
+
+  Everything else       Stale-while-revalidate   Instant response from cache
+                                                 (if any) while quietly
+                                                 refreshing it in the
+                                                 background.
+  --------------------------------------------------------------------------
+
+Lifecycle
+
+-   install — precaches '/', '/index.html', '/manifest.json' and calls
+    self.skipWaiting() so a newly deployed worker activates immediately
+    rather than waiting for all tabs to close.
+
+-   activate — deletes any cache whose name isn't the current CACHE_NAME
+    (attendx-pwa-v1.3.2), then calls clients.claim() to take control of
+    already-open tabs.
+
+  -----------------------------------------------------------------------
+  Operational note: Cache-busting is manual: CACHE_NAME must be bumped in
+  service-worker.js on every deploy that changes a cached asset, or
+  returning users may keep seeing stale files until the old cache is
+  evicted by a version bump.
+
+  -----------------------------------------------------------------------
+
+6. Application Architecture
+
+UI composition
+
+The DOM is divided into “screens” (login, setup wizard, home) and
+“views” (register, students, records, analytics, alerts, manage,
+notices), each a plain <div> toggled active/inactive via CSS classes.
+There is no virtual DOM diffing — modules re-render by rebuilding
+.innerHTML wholesale for their container element on every state change
+that affects them.
+
+Module pattern
+
+Each feature area is a single global object literal (e.g. Auth, App,
+Register, Students, Classes, Records, Analytics, ExportEngine, Notices,
+Alerts, ManageView, ProfileModal, BackupEngine, SubjectMaster,
+TeacherAnalytics, InstallPrompt). Modules own their DOM ids, expose
+methods invoked directly from inline onclick="Module.method()" HTML
+attribute handlers, and read/write the shared State object.
+
+Render flow (typical)
+
+1.  A UI event (button tap) calls a Module method, e.g.
+    Register.mark(studentId, 'present').
+
+2.  The method mutates State in place (in-memory only at this point).
+
+3.  The method calls the module's own render() to rebuild the relevant
+    DOM subtree.
+
+4.  On a “commit” action (e.g. Register.submit()), the method also calls
+    saveAll()/DB.set(...) to persist to localStorage, and — where
+    relevant — fires an API.post(...) call to mirror the change to the
+    cloud backend.
+
+7. Client-Side Data Model (State)
+
+State is a single global object holding the entire working session. Key
+fields:
+
+  ---------------------------------------------------------------------------------------------
+  Field                 Shape                                     Description
+  --------------------- ----------------------------------------- -----------------------------
+  users[]               {id, username, password, role, biometric, Local accounts. Passwords are
+                        credentialId, bioType, theme, ...profile} plain text (see Section 16).
+
+  loggedIn /            bool / object                             Current session state.
+  currentUser                                                     
+
+  institutions[] /      {id, name, color}                         Free plan: 1 active
+  activeInstitutionId                                             institution.
+
+  branches[] /          {id, name, color, institutionId}          Free plan: 1 active branch.
+  activeBranchId                                                  
+
+  classes[]             {id, name, subject, color, institutionId, Class/section records; up to
+                        branchId}                                 3 per institution+branch on
+                                                                  Free plan.
+
+  students[]            {id, name, roll, sid, classId, pmobile,   Roster, scoped to a class via
+                        pemail, ptelegram, ...}                   classId.
+
+  records[]             {id, classId, institutionId, branchId,    One saved attendance session
+                        date, type,                               per class+date.
+                        attendance:{studentId:{status,remark}},   
+                        savedAt, batch, institutionName}          
+
+  categories[] /        backend-defined                           Department → class → section
+  subCategories[] /                                               master data, mirrored from
+  subSubCategories[]                                              the cloud.
+
+  notices[]             {noticeId, topic, description,            Notice-board posts, synced
+                        department, class, section, durationFrom, from backend.
+                        durationTo, attachmentUrl, postedBy,      
+                        postedAt}                                 
+
+  subjectMaster[]       backend-defined                           Subject master list used by
+                                                                  reporting.
+
+  subjects[]            string[]                                  Legacy free-text subject list
+                                                                  for the Classes form
+                                                                  dropdown.
+
+  threshold             number (default 75)                       Attendance % below which a
+                                                                  student is flagged “at risk”
+                                                                  in Analytics.
+
+  currentClassId        string                                    Class currently selected via
+                                                                  the class-chip bar.
+
+  attendance            {studentId: {status, remark}}             Unsaved, in-progress marks
+                                                                  for the open Register
+                                                                  session.
+  ---------------------------------------------------------------------------------------------
+
+  -----------------------------------------------------------------------
+  Note: Attendance cell values are stored in a slightly inconsistent
+  shape across the codebase for backwards compatibility: newer records
+  use {status, remark}, but helper functions attStatus()/attRemark() also
+  accept a bare status string ('present'/'absent') for older/legacy
+  records. Any new code reading State.records must go through these
+  helpers rather than assuming one shape.
+
+  -----------------------------------------------------------------------
+
+8. Persistence Layer (localStorage)
+
+The DB object is a minimal wrapper around window.localStorage:
+
+const DB = {
+NS: 'ax2_',
+get(k, fb=null) { /* JSON.parse(localStorage[NS+k]) or fb on any error
+*/ },
+set(k, v) { /* localStorage[NS+k] = JSON.stringify(v) */ },
+remove(k) { /* localStorage.removeItem(NS+k) */ }
+};
+
+-   All keys are namespaced with the prefix ax2_, so AttendX can share
+    an origin with other apps without key collisions.
+
+-   saveAll() is the single entry point that persists every top-level
+    State collection (users, institutions, branches, classes, students,
+    records, subjects, categories, subCategories, subSubCategories,
+    notices, subjectMaster) in one call — used after most write
+    operations.
+
+-   There is no IndexedDB usage and no storage-quota handling beyond
+    try/catch swallowing errors — very large datasets could eventually
+    hit the browser's localStorage size limit (typically 5–10MB per
+    origin).
+
+-   A separate manual escape hatch, BackupEngine, exports/imports the
+    same dataset as a downloadable .json file (full snapshot, full
+    replace on import — not a merge).
+
+9. Backend Integration (Google Apps Script API)
+
+The API object wraps fetch() calls to a single Google Apps Script Web
+App URL (GAS_URL), which acts as a REST-like façade over a Google Sheet.
+
+GET ${GAS_URL}?action=<action>&<params> → API.get(action, params)
+POST ${GAS_URL} body: {action, data} → API.post(action, data)
+Content-Type: text/plain;charset=utf-8
+(chosen specifically to avoid a CORS preflight,
+since Apps Script web apps handle preflight poorly)
+
+Actions used by the client
+
+  ------------------------------------------------------------------------
+  Action                        Method    Purpose
+  ----------------------------- --------- --------------------------------
+  students                      GET       Fetch the full student roster.
+
+  getCategories /               GET       Fetch department→class→section
+  getSubCategories /                      master data.
+  getSubSubCategories                     
+
+  getSubjects                   GET       Fetch the subject master list.
+
+  getSubjectReport              GET       Fetch subject-wise attendance
+                                          report data.
+
+  getNotices                    GET       Fetch notice-board posts.
+
+  saveInstitution /             POST      Create/update or remove an
+  deleteInstitution                       institution.
+
+  saveBranch / deleteBranch     POST      Create/update or remove a
+                                          branch.
+
+  saveClass                     POST      Create/update a class.
+
+  addStudent / deleteStudent /  POST      Add, remove, or bulk-import
+  importStudents                          students.
+
+  markAttendance                POST      Push a saved attendance record
+                                          to the cloud.
+
+  postNotice / updateNotice /   POST      Create, edit, or remove a
+  deleteNotice                            notice.
+
+  saveSubject / deleteSubject   POST      Create/update or remove a
+                                          subject master entry.
+
+  importCategories /            POST      Bulk-import master data from
+  importSubCategories /                   CSV.
+  importSubSubCategories                  
+  ------------------------------------------------------------------------
+
+Sync model
+
+-   Every API call first checks navigator.onLine; if false, it returns
+    null immediately without attempting a network request.
+
+-   Writes are “local-first”: the caller mutates State and DB
+    (localStorage) synchronously, then fires the matching API.post(...)
+    without awaiting UI feedback on its result (fire-and-forget) — e.g.
+    Register.submit() saves the attendance record locally, shows a
+    success toast, and only then posts to the cloud in the background.
+
+-   Reads for master data (students, categories, subjects, notices) are
+    refreshed opportunistically — primarily on login
+    (Auth._syncWithBackend()) — and simply overwrite the corresponding
+    State array + localStorage cache.
+
+-   There is no conflict-resolution or merge logic anywhere in the
+    client: the most recent write (local or remote) wins in an
+    unstructured way. Concurrent edits from two devices to the same
+    record are not reconciled.
+
+  -----------------------------------------------------------------------
+  Operational note: GAS_URL is hard-coded as a constant in the client
+  script. Rotating the backend deployment requires editing and
+  redeploying index.html.
+
+  -----------------------------------------------------------------------
+
+10. Authentication & Session Management
+
+Accounts
+
+Registration (Auth.register) creates a user object { id, username,
+password, role, biometric:false, credentialId:null, theme:'light' } and
+appends it to State.users / DB('users'). Login (Auth.login) does a
+direct field match against username, password, and the selected role.
+
+  -----------------------------------------------------------------------
+  Security: Passwords are stored in plain text in localStorage — there is
+  no hashing (e.g. bcrypt/PBKDF2/Argon2) anywhere in the auth flow. This
+  is a significant weakness if the deployment target is anything beyond a
+  trusted single-user device; see Section 16 for hardening
+  recommendations.
+
+  -----------------------------------------------------------------------
+
+Sessions
+
+-   “Remember me” checked → session token {username, role} written to
+    localStorage under key AttendXSession (persists across browser
+    restarts).
+
+-   “Remember me” unchecked → same token written to sessionStorage
+    instead (cleared when the tab/window closes).
+
+-   Auth.init() (run on every page load) checks both storages and, if a
+    token matches an existing user, logs them in automatically without
+    re-prompting for a password.
+
+Biometric second factor
+
+Optional, offered right after registration if window.PublicKeyCredential
+exists:
+
+5.  WebAuthn platform passkey — navigator.credentials.create() registers
+    a platform authenticator (fingerprint/face/device PIN, whichever the
+    OS provides) with algorithm preferences ES256 (-7) and RS256 (-257),
+    authenticatorAttachment:'platform', userVerification:'required'. The
+    resulting credential's rawId is base64-encoded and stored as
+    user.credentialId with bioType:'webauthn'. Requires HTTPS or
+    localhost.
+
+6.  PIN fallback — if WebAuthn is unavailable or fails, the user is
+    prompted (via window.prompt) for a 4–8 digit PIN. A simple
+    non-cryptographic string hash (bitwise-shift accumulator, not a real
+    KDF) of pin + '::' + username + '::attendx_salt_v1' is stored as
+    user.credentialId with bioType:'pin'.
+
+Auth.biometric() (invoked from the login screen) tries WebAuthn
+verification first for any WebAuthn-registered users, then falls back to
+prompting for the shared PIN and checking it against every
+PIN-registered user's stored hash.
+
+  -----------------------------------------------------------------------
+  Security: The PIN hash function is a toy 32-bit rolling hash, not a
+  cryptographic hash — it provides only casual protection against someone
+  glancing at localStorage, not a real security guarantee against a
+  determined attacker with local storage access.
+
+  -----------------------------------------------------------------------
+
+11. Role-Based Access Control
+
+Two roles: admin and teacher. applyRolePermissions() runs after most
+view renders and toggles the visibility of admin-only controls: the
+Manage tile, individual record delete buttons, and the Records “Clear
+All” button. App.openView('manage') additionally hard-blocks non-admins
+with a toast + redirect Home.
+
+  -----------------------------------------------------------------------
+  Security: This is purely a client-side UI guard. Since the entire
+  dataset lives in the browser's own localStorage and there is no
+  server-side session/authorization check on the GAS endpoints as used by
+  this client, a technically capable user could open devtools and call
+  any API action directly, or edit localStorage, bypassing the role check
+  entirely. Treat the admin/teacher distinction as a UX affordance, not
+  an access-control boundary — do not rely on it to protect sensitive
+  data in a multi-tenant or adversarial deployment.
+
+  -----------------------------------------------------------------------
+
+12. Client-Side Routing / History Handling
+
+App.openView(id) / App.goHome() act as a minimal router: they toggle the
+.active view element, update the topbar title, rebuild the class-chip
+selector, and call the appropriate module's render(). Each call also
+pushes a History API state entry ({axView:id} or {axView:null}) unless
+it originated from a popstate event itself (tracked via a fromPop flag,
+to avoid a push/pop feedback loop).
+
+A single window 'popstate' listener re-opens whatever view is recorded
+in event.state, or returns Home if state is null. This makes the
+mobile/browser hardware back button step back through in-app views one
+at a time — matching native app back-navigation — instead of immediately
+exiting the PWA on the first back-press. The listener is a no-op while
+signed out.
+
+13. Module Reference
+
+Summary of every top-level module/object in the script, in source order:
+
+  ---------------------------------------------------------------------------
+  Module                  Responsibility
+  ----------------------- ---------------------------------------------------
+  DB                      localStorage get/set/remove wrapper, namespaced
+                          'ax2_'.
+
+  State                   Single in-memory source of truth for the session.
+
+  API                     fetch() wrapper for the Google Apps Script backend.
+
+  Modals / Confirm        Generic open/close for modal overlays; reusable
+                          confirm dialog.
+
+  Auth                    Registration, login, sessions, biometric/PIN 2FA,
+                          boot sequence.
+
+  SetupWizard             First-run 3-step institution/branch setup for new
+                          Admins.
+
+  App                     View router: openView/goHome, class-chip selector,
+                          history integration.
+
+  TeacherAnalytics        Home-screen summary stat cards shown to Teacher
+                          role only.
+
+  BackupEngine            Manual full-dataset JSON export/import.
+
+  Subjects                CRUD for the legacy free-text subject list.
+
+  ManageView              Admin console shell: tab switching across Manage
+                          sub-sections.
+
+  Classes                 CRUD for class/section records, enforces the
+                          3-class Free-plan cap.
+
+  Register                Attendance-marking screen: mark/submit/edit a
+                          session.
+
+  Students                Roster CRUD, CSV import, search, A–Z grouping.
+
+  Records                 Read view of saved attendance sessions, edit/delete
+                          entry points.
+
+  ExportEngine            Builds and downloads CSV exports
+                          (session/summary/date-range).
+
+  Analytics               Per-student % table + hand-rolled SVG bar charts
+                          for the active class.
+
+  SubjectReport           Subject-wise attendance breakdown and charts.
+
+  AlertsView              Surfaces at-risk / recently-absent students for
+                          follow-up.
+
+  Notices                 Notice-board list, post/edit/delete, unread badge,
+                          attachments.
+
+  SubjectMaster           Manage-view CRUD for the detailed subject master
+                          list.
+
+  uploadMasterDataCSV()   Generic CSV importer for
+                          category/sub-category/sub-sub-category data.
+
+  Alerts                  Builds absence/monthly parent-notice message
+                          previews.
+
+  ProfileModal            Self-service profile fields, theme switch, backup
+                          shortcuts, sign out.
+
+  InstallPrompt           Wraps beforeinstallprompt / iOS manual-install
+                          guidance.
+  ---------------------------------------------------------------------------
+
+14. UI & Theming
+
+All colours, radii, and fonts are defined as CSS custom properties on
+:root, with a second set of overrides scoped to body[data-theme="light"]
+for light mode — ProfileModal.save() toggles this attribute and persists
+the choice per-user (user.theme). There is no CSS-in-JS or component
+styling system; all styling is global CSS selectors.
+
+-   Font stack: Inter (UI text), JetBrains Mono (code-like/monospace
+    elements).
+
+-   Icons: Tabler Icons webfont, loaded from a CDN — requires network on
+    first load (cached thereafter by the service worker's CDN
+    cache-first rule).
+
+-   Charts: simple bar charts are hand-built as raw <svg> markup by JS
+    (see Analytics/SubjectReport) rather than via a charting library —
+    keeps the app dependency-free but means chart features are limited
+    to what's been hand-coded.
+
+15. Business Rules & Plan Limits
+
+-   Free plan: 1 active institution, 1 active branch, up to 3 classes
+    per active institution+branch pair. Enforced client-side only in
+    ManageView/Classes (maxFree/atLimit checks) — there is no
+    server-side enforcement of these limits.
+
+-   Attendance threshold: State.threshold (default 75%) drives the “at
+    risk” highlighting in Analytics and the monthly Alerts message
+    wording; configurable but not extensively surfaced in the current UI
+    beyond initial default.
+
+-   Attendance record identity: one record per (classId, date) pair;
+    re-submitting the same date for the same class from Register
+    overwrites the prior record for that date rather than creating a
+    second one, when done via the Edit → resubmit flow using the same
+    record id.
+
+16. Known Limitations & Security Notes
+
+Security
+
+-   Passwords stored in plain text in localStorage (see Section 10) —
+    recommend adding server-side auth with hashed credentials before any
+    multi-user or internet-facing deployment beyond a single trusted
+    device.
+
+-   PIN-based biometric fallback uses a non-cryptographic hash —
+    adequate only as a casual local convenience gate.
+
+-   Role-based access control is UI-only (see Section 11); the GAS
+    backend endpoints, as called by this client, are not shown to
+    perform their own authorization checks from this codebase's
+    perspective — verify and harden authorization at the Apps Script
+    layer if sensitive data is involved.
+
+-   The Google Apps Script URL (GAS_URL) is a public,
+    unauthenticated-looking endpoint embedded directly in client-side
+    source — anyone who reads the page source can call it directly.
+
+Data integrity
+
+-   No conflict resolution between local and cloud writes; last write
+    wins with no merge or version tracking.
+
+-   localStorage has practical size limits (commonly 5–10MB/origin);
+    very large student/record datasets over a long institutional history
+    could eventually hit this ceiling with no built-in warning beyond a
+    silent try/catch failure in DB.set().
+
+-   Attendance cell data has two historical shapes (bare string vs
+    {status,remark} object) — always read through
+    attStatus()/attRemark(), never assume the raw shape.
+
+Feature flags / dormant code
+
+-   A “Bluetooth Attendance” entry point (linking to a bluetooth.html
+    page) exists in the markup but is commented out and its target page
+    is not part of this file set — treat as an inactive/planned feature,
+    not a bug.
+
+CSV parsing
+
+-   Both the student importer and the master-data importer
+    (uploadMasterDataCSV) split rows on a naive comma-split and do not
+    handle quoted fields containing commas — values with embedded commas
+    in a source spreadsheet will misalign columns on import.
+
+17. Deployment Notes
+
+7.  Host index.html, manifest.json, and service-worker.js as static
+    files at the root of your domain (service-worker.js is registered
+    with scope '/', so it must be served from the root, not a sub-path,
+    for the manifest's scope:'/' to work as intended).
+
+8.  Ensure the site is served over HTTPS — required both for service
+    worker registration in most browsers and for WebAuthn biometric
+    login to function.
+
+9.  Provide the icons referenced in manifest.json
+    (icons/icon-192x192.png, icons/icon-512x512.png,
+    icons/maskable-icon.png, plus the favicon referenced in <head>) at
+    the expected paths.
+
+10. Deploy the companion Google Apps Script project as a Web App
+    (execute as: Me / access: Anyone), and update the GAS_URL constant
+    near the top of the inline <script> in index.html to match its
+    deployment URL.
+
+11. Bump CACHE_NAME in service-worker.js on every release that changes
+    any cached static asset, so returning users pick up the update
+    instead of being served a stale cached shell.
+
+— End of Technical Documentation —
