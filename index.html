@@ -620,17 +620,6 @@ thead th.sticky-col{background:var(--surface2);z-index:2}
 
 
 
-
-
-
-    <!-- <div style="width:100%;margin-bottom:10px">
-      <a href="bluetooth.html" class="btn bt-attend-btn" style="width:100%;justify-content:center;padding:13px;border-radius:var(--r10);font-size:.95rem;display:flex;align-items:center;gap:9px;text-decoration:none">
-        <i class="ti ti-bluetooth"></i> Bluetooth Attendance
-      </a>
-    </div> -->
- 
-
-
     <div class="home-logout">
       <button id="pwa-install-btn" class="pwa-install-btn" style="display:none;" onclick="installPWA()"><i class="ti ti-download"></i> Install App</button>
     </div>
@@ -706,6 +695,19 @@ thead th.sticky-col{background:var(--surface2);z-index:2}
         </div>
       </div>
       <div class="roster" id="roster"></div>
+      
+
+      <div style="max-width: 600px; background: #f3f5fa; border: 1.5px dashed #cbd5e1; border-radius: 16px; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; font-family: system-ui, -apple-system, sans-serif;">
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <span style="color: #55607a; font-size: 14px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;">BLE HOSTING</span>
+          <span style="color: #525f7f; font-size: 15px;">Allow student check-ins.</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 12px;">
+          <span id="ble-status" style="background: #e2e8f0; color: #0f172a; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 6px; letter-spacing: 0.5px;">OFFLINE</span>
+          <button id="ble-btn" onclick="toggleBleState(this)" style="background: #6366f1; color: #fff; border: none; border-radius: 12px; padding: 8px 24px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.2s;">Start</button>
+        </div>
+      </div>
+ 
       <div class="submit-bar">
         <p class="submit-info" id="submit-info">Mark attendance above, then save.</p>
         <button class="btn btn-sm" onclick="Register.clearSession()"><i class="ti ti-refresh"></i> Reset</button>
@@ -784,6 +786,7 @@ thead th.sticky-col{background:var(--surface2);z-index:2}
         </div>
         <div class="page-actions">
           <button class="btn btn-sm" onclick="Students.openImport()"><i class="ti ti-upload"></i> Import CSV</button>
+          <button class="btn btn-sm" onclick="Students.downloadCsvFormat()"><i class="ti ti-file-download"></i> Download CSV Format</button>
           <button class="btn btn-sm btn-primary" onclick="Students.openAddModal()"><i class="ti ti-user-plus"></i> Add Student</button>
         </div>
       </div>
@@ -1343,7 +1346,7 @@ const State={
    checks navigator.onLine and short-circuits to null when offline, so
    callers must treat a null/!success response as "not synced yet" and
    keep working from local State — the app never blocks on the network. */
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbz3jhbjsOFRetcmIpOaltXEl6EiZP63rhss5smHeVDIaF9r2eQMitcx8YugN1VAk_v5/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbyj0ZzYH5is116mx0wIgtVVfz0Wjo-_7pGqbD7vqDfOVpKz9hd-curEznX0DMwgD1SWAQ/exec';
 
 const API = {
   async get(action) {
@@ -1887,6 +1890,19 @@ _loadData(){
     InstallPrompt.onLogin();
   }
 };
+
+function toggleBleState(btn) {
+  const status = document.getElementById('ble-status');
+  const isOffline = status.innerText === 'OFFLINE';
+
+  status.innerText = isOffline ? 'ONLINE' : 'OFFLINE';
+  status.style.background = isOffline ? '#dcfce7' : '#e2e8f0';
+  status.style.color = isOffline ? '#166534' : '#0f172a';
+
+  btn.innerText = isOffline ? 'Stop' : 'Start';
+  btn.style.background = isOffline ? '#ef4444' : '#6366f1';
+}
+
 /* ══ SETUP WIZARD ═════════════════════════════════════════════════
    First-run 3-step flow shown to a new admin: (1) create an
    Institution, (2) create a Branch/Department, (3) confirmation screen
@@ -2732,6 +2748,30 @@ const Register={
    view toggle. Each student is tagged with classId to scope it to one
    class/section. */
 const Students={
+  downloadCsvFormat(){
+    const headers=['name','roll_number','student_id','mobile','email','parent_mobile','parent_telegram','parent_email'];
+    const sampleRows=[
+      ['K.Hemanth','B2-01','TMSS2601','+91 9100380591','hemanth@tmss.edu','+91 9100380591','@hemanth_parent','hemanth.parent@gmail.com'],
+      ['Rahul Das','B2-02','TMSS2602','+91 9862057289','rahul@tmss.edu','+91 9862057289','@rahul_parent','rahul.parent@gmail.com'],
+      ['Rishab','B2-03','TMSS2603','+91 9863475903','rishab@tmss.edu','+91 9863475903','@rishab_parent','rishab.parent@gmail.com']
+    ];
+    const esc=v=>{
+      v=String(v??'');
+      return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;
+    };
+    const lines=[headers.join(','),...sampleRows.map(r=>r.map(esc).join(','))];
+    const csvContent='\uFEFF'+lines.join('\r\n');
+    const blob=new Blob([csvContent],{type:'text/csv;charset=utf-8;'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download='student_import_format.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('CSV format downloaded');
+  },
   toggleGrouping(){
     State.studentsGrouped=!State.studentsGrouped;
     const btn=document.getElementById('btn-group-toggle');
