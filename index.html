@@ -2749,11 +2749,26 @@ const Register={
    class/section. */
 const Students={
   downloadCsvFormat(){
-    const headers=['name','roll_number','student_id','mobile','email','parent_mobile','parent_telegram','parent_email'];
-    const sampleRows=[
-      ['K.Hemanth','B2-01','TMSS2601','+91 9100380591','hemanth@tmss.edu','+91 9100380591','@hemanth_parent','hemanth.parent@gmail.com'],
-      ['Rahul Das','B2-02','TMSS2602','+91 9862057289','rahul@tmss.edu','+91 9862057289','@rahul_parent','rahul.parent@gmail.com'],
-      ['Rishab','B2-03','TMSS2603','+91 9863475903','rishab@tmss.edu','+91 9863475903','@rishab_parent','rishab.parent@gmail.com']
+    const headers = ['name', 'roll_number', 'student_id', 'mobile', 'email', 'parent_mobile', 'parent_telegram', 'parent_email'];
+    const sampleRows = [
+      ['Rishab', 'A01', 'STU001', '+91 98765 43210', 'rishab@school.edu', '+91 98765 00001', '@rishabparent', 'parent.rishab@email.com'],
+      ['Kunjana', 'A02', 'STU002', '+91 98765 43211', 'kunjana@school.edu', '+91 98765 00002', '@kunjanaparent', 'parent.kunjana@email.com'],
+      ['Rahul', 'A03', 'STU003', '+91 98765 43212', 'rahul@school.edu', '+91 98765 00003', '@rahulparent', 'parent.rahul@email.com'],
+      ['Thanveer', 'A04', 'STU004', '+91 98765 43213', 'thanveer@school.edu', '+91 98765 00004', '@thanveerparent', 'parent.thanveer@email.com'],
+      ['Shyam', 'A05', 'STU005', '+91 98765 43214', 'shyam@school.edu', '+91 98765 00005', '@shyamparent', 'parent.shyam@email.com'],
+      ['Hemanth', 'A06', 'STU006', '+91 98765 43215', 'hemanth@school.edu', '+91 98765 00006', '@hemanthparent', 'parent.hemanth@email.com'],
+      ['Anindya', 'A07', 'STU007', '+91 98765 43216', 'anindya@school.edu', '+91 98765 00007', '@anindyaparent', 'parent.anindya@email.com'],
+      ['Arjun', 'A08', 'STU008', '+91 98765 43217', 'arjun@school.edu', '+91 98765 00008', '@arjunparent', 'parent.arjun@email.com'],
+      ['Priya', 'A09', 'STU009', '+91 98765 43218', 'priya@school.edu', '+91 98765 00009', '@priyaparent', 'parent.priya@email.com'],
+      ['Aarav', 'A10', 'STU010', '+91 98765 43219', 'aarav@school.edu', '+91 98765 00010', '@aaravparent', 'parent.aarav@email.com'],
+      ['Sneha', 'A11', 'STU011', '+91 98765 43220', 'sneha@school.edu', '+91 98765 00011', '@snehaparent', 'parent.sneha@email.com'],
+      ['Aditya', 'A12', 'STU012', '+91 98765 43221', 'aditya@school.edu', '+91 98765 00012', '@adityaparent', 'parent.aditya@email.com'],
+      ['Ananya', 'A13', 'STU013', '+91 98765 43222', 'ananya@school.edu', '+91 98765 00013', '@ananyaparent', 'parent.ananya@email.com'],
+      ['Rohan', 'A14', 'STU014', '+91 98765 43223', 'rohan@school.edu', '+91 98765 00014', '@rohanparent', 'parent.rohan@email.com'],
+      ['Meera', 'A15', 'STU015', '+91 98765 43224', 'meera@school.edu', '+91 98765 00015', '@meeraparent', 'parent.meera@email.com'],
+      ['Vikram', 'A16', 'STU016', '+91 98765 43225', 'vikram@school.edu', '+91 98765 00016', '@vikramparent', 'parent.vikram@email.com'],
+      ['Kavya', 'A17', 'STU017', '+91 98765 43226', 'kavya@school.edu', '+91 98765 00017', '@kavyaparent', 'parent.kavya@email.com'],
+      ['Ishaan', 'A18', 'STU018', '+91 98765 43227', 'ishaan@school.edu', '+91 98765 00018', '@ishaanparent', 'parent.ishaan@email.com']
     ];
     const esc=v=>{
       v=String(v??'');
